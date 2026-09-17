@@ -214,3 +214,9 @@ endif()
 
 # enable include of header files with /src/ as root of path
 target_include_directories(athena PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Link pybind11 embedding support if available
+if (TARGET pybind11::embed)
+  target_link_libraries(athena PRIVATE pybind11::embed)
+  target_compile_definitions(athena PRIVATE -DPYBIND)
+endif()

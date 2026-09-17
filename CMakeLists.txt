@@ -5,6 +5,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(athena VERSION 0.1 LANGUAGES C CXX)
 
+# Include pybind11
+add_subdirectory(external/pybind11)
+
 # Disable in-source builds to prevent source tree corruption.
 if( "${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}" )
   message(FATAL_ERROR "FATAL: In-source builds disabled. Please create a separate build directory in which to run cmake, e.g. mkdir build; cd build; cmake ../" )
