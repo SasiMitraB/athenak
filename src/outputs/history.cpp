@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -23,6 +24,7 @@
 #include "z4c/z4c.hpp"
 #include "coordinates/adm.hpp"
 #include "outputs.hpp"
+#include "srcterms/srcterms.hpp"
 
 //----------------------------------------------------------------------------------------
 // Constructor: also calls BaseTypeOutput base class constructor
@@ -429,6 +431,8 @@ void HistoryOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin) {
         std::fprintf(pfile,"# Athena++ history data\n");
         std::fprintf(pfile,"#  [%d]=time      ", iout++);
         std::fprintf(pfile,"[%d]=dt       ", iout++);
+        std::fprintf(pfile,"[%d]=dt_cfl   ", iout++);
+        std::fprintf(pfile,"[%d]=dt_cool  ", iout++);
         for (int n=0; n<data.nhist; ++n) {
           std::fprintf(pfile,"[%d]=%.10s    ", iout++, data.label[n].c_str());
         }
@@ -436,9 +440,29 @@ void HistoryOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin) {
         data.header_written = true;
       }
 
+      // Per-component candidate timesteps (same terms Mesh::NewTimeStep() combines),
+      // so dt_cfl/dt_cool can be compared directly against each other and against dt.
+      // "No constraint" (e.g. no SourceTerms block, or cooling inactive) reports as
+      // float_max rather than 0, matching how the underlying dtnew fields behave.
+      Real dt_cfl = std::numeric_limits<float>::max();
+      Real dt_cool = std::numeric_limits<float>::max();
+      if (pm->pmb_pack->phydro != nullptr) {
+        dt_cfl = pm->cfl_no * pm->pmb_pack->phydro->dtnew;
+        if (pm->pmb_pack->phydro->psrc != nullptr) {
+          dt_cool = pm->cfl_no * pm->pmb_pack->phydro->psrc->dtnew;
+        }
+      } else if (pm->pmb_pack->pmhd != nullptr) {
+        dt_cfl = pm->cfl_no * pm->pmb_pack->pmhd->dtnew;
+        if (pm->pmb_pack->pmhd->psrc != nullptr) {
+          dt_cool = pm->cfl_no * pm->pmb_pack->pmhd->psrc->dtnew;
+        }
+      }
+
       // write history variables
       std::fprintf(pfile, out_params.data_format.c_str(), pm->time);
       std::fprintf(pfile, out_params.data_format.c_str(), pm->dt);
+      std::fprintf(pfile, out_params.data_format.c_str(), dt_cfl);
+      std::fprintf(pfile, out_params.data_format.c_str(), dt_cool);
       for (int n=0; n<data.nhist; ++n)
         std::fprintf(pfile, out_params.data_format.c_str(), data.hdata[n]);
       std::fprintf(pfile,"\n"); // terminate line

@@ -33,6 +33,7 @@ class SourceTerms {
   bool const_accel;
   bool ism_cooling;
   bool rel_cooling;
+  bool user_cooling;  // cooling timestep supplied externally (e.g. by a pgen's user_srcs_func)
   bool rad_beam;
   bool self_gravity;
 

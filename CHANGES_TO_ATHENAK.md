@@ -28,12 +28,12 @@ This document records the upstream AthenaK base version used in this repository,
 ## Summary of Changes
 
 ### 1. Build System & Dependency Integration (pybind11)
-- **Root CMake Configuration ([`CMakeLists.txt`](file:///home/sasi/Projects/SubgridCGMModel/athenak/CMakeLists.txt)):**
+- **Root CMake Configuration ([`CMakeLists.txt`](./CMakeLists.txt)):**
   - Added `add_subdirectory(external/pybind11)` to include pybind11 in the build.
-- **Source CMake Configuration ([`src/CMakeLists.txt`](file:///home/sasi/Projects/SubgridCGMModel/athenak/src/CMakeLists.txt)):**
+- **Source CMake Configuration ([`src/CMakeLists.txt`](./src/CMakeLists.txt)):**
   - Linked `pybind11::embed` to the Athena executable (`target_link_libraries(athena PRIVATE pybind11::embed)`).
   - Added preprocessor definition `-DPYBIND` for embedding support.
-- **External Dependencies ([`external/pybind11`](file:///home/sasi/Projects/SubgridCGMModel/athenak/external/pybind11)):**
+- **External Dependencies ([`external/pybind11`](./external/pybind11)):**
   - Added pybind11 submodule/tree under `external/pybind11`.
 
 ---
@@ -51,7 +51,14 @@ This document records the upstream AthenaK base version used in this repository,
 ---
 
 ### 3. Problem Generators (New Files)
-- **[`src/pgen/subgrid.cpp`](file:///home/sasi/Projects/SubgridCGMModel/athenak/src/pgen/subgrid.cpp):**
+- **[`src/pgen/subgrid.cpp`](./src/pgen/subgrid.cpp):**
   - Added problem generator integrating embedded Python via `pybind11` (`pybind11/embed.h`, `pybind11/numpy.h`) alongside ISM cooling routines for subgrid modeling.
-- **[`src/pgen/kh_radiative_cooling.cpp`](file:///home/sasi/Projects/SubgridCGMModel/athenak/src/pgen/kh_radiative_cooling.cpp):**
+- **[`src/pgen/kh_radiative_cooling.cpp`](./src/pgen/kh_radiative_cooling.cpp):**
   - Added problem generator for Kelvin-Helmholtz instability simulations with radiative cooling support.
+
+---
+
+### 4. Subgrid Timestep Restriction
+- **[`src/pgen/subgrid.cpp`](./src/pgen/subgrid.cpp) (`UserSourceTerm`, ~line 515):**
+  - The embedded Python `source_module.source_func` returns a cooling-limited timestep (`dt_cool`) alongside the source term array, computed from the subgrid CNN's predicted cooling rates.
+  - This is written to `pmbp->phydro->psrc->dtnew`, so AthenaK's timestep controller respects the subgrid cooling timescale in addition to the usual CFL constraint.

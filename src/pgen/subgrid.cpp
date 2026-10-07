@@ -15,6 +15,7 @@
 #include "parameter_input.hpp"
 #include "pgen.hpp"
 #include "srcterms/ismcooling.hpp" // Included ISM cooling function
+#include "srcterms/srcterms.hpp"   // needed for psrc->dtnew
 #include "units/units.hpp"
 
 // pybind11 headers
@@ -501,7 +502,7 @@ void UserSourceTerm(Mesh *pm, const Real bdt) {
       Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), fmclrho_d);
 
   // Wrap Kokkos::View data in py::array without copy
-  py::array_t<double> S_arr =
+  py::tuple result =
       (*psource_func)(py::array_t<double>({nmb * Ni, Nj}, dens_h.data()),
                       py::array_t<double>({nmb * Ni, Nj}, press_h.data()),
                       py::array_t<double>({nmb * Ni, Nj}, vx_h.data()),
@@ -509,6 +510,12 @@ void UserSourceTerm(Mesh *pm, const Real bdt) {
                       py::array_t<double>({nmb * Ni, Nj}, tracer_h.data()),
                       py::array_t<double>({nmb * Ni, Nj}, fmclrho_h.data()),
                       bdt);
+
+  py::array_t<double> S_arr = result[0].cast<py::array_t<double>>();
+  Real dt_cool = static_cast<Real>(result[1].cast<double>());
+  if (pmbp->phydro->psrc != nullptr) {
+    pmbp->phydro->psrc->dtnew = dt_cool;
+  }
 
   auto S_buf = S_arr.unchecked<2>();
 

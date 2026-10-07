@@ -23,6 +23,13 @@
 //! \brief Compute new timestep for source terms.
 
 void SourceTerms::NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos_data) {
+  if (user_cooling) {
+    // dtnew was already populated this stage by the pgen's user_srcs_func
+    // (e.g. UserSourceTerm() in subgrid.cpp), which computes its own cooling
+    // rate externally. Skip the generic reset/ism/rel-cooling logic below.
+    return;
+  }
+
   auto &indcs = pmy_pack->pmesh->mb_indcs;
   int is = indcs.is, nx1 = indcs.nx1;
   int js = indcs.js, nx2 = indcs.nx2;

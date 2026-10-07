@@ -11,6 +11,7 @@
 #include "srcterms.hpp"
 
 #include <iostream>
+#include <limits>
 #include <string> // string
 
 #include "athena.hpp"
@@ -40,8 +41,14 @@ SourceTerms::SourceTerms(std::string block, MeshBlockPack *pp, ParameterInput *p
   const_accel = pin->GetOrAddBoolean(block, "const_accel", false);
   ism_cooling = pin->GetOrAddBoolean(block, "ism_cooling", false);
   rel_cooling = pin->GetOrAddBoolean(block, "rel_cooling", false);
+  user_cooling = pin->GetOrAddBoolean(block, "user_cooling", false);
   rad_beam = pin->GetOrAddBoolean(block, "rad_beam", false);
   self_gravity = pin->GetOrAddBoolean(block, "self_gravity", false);
+
+  // dtnew is otherwise only set inside NewTimeStep(); give it a sane default so
+  // it's never read uninitialized before the first call (e.g. for user_cooling,
+  // which relies on a pgen's user_srcs_func to populate it directly)
+  dtnew = std::numeric_limits<float>::max();
 
   // (1) read data for (constant) gravitational acceleration
   if (const_accel) {
