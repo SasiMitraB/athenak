@@ -7,15 +7,20 @@
 //! \file kh_radiative_cooling.cpp
 //  \brief Problem generator for KH instability with radiative cooling.
 //  Sets up different initial conditions selected by flag "iprob"
-//    - iprob=1 : tanh profile with multiple mode perturbation
+//    - iprob=1 : tanh profile with multiple mode perturbation (varies along x1 only, so a
+//                3D run stays exactly invariant along x3)
+//    - iprob=2 : tanh profile with white noise perturbation at interface (every cell gets
+//                its own random vy, which seeds 3D motions)
+//    - init_file != "none" : read the initial state from a binary file (overrides iprob)
 //  Can add other iprob flags for different initial setups.
-//  Can also turn on radiative cooling by setting "use_radiation" to true in the input file.
+//  Can also turn on radiative cooling by setting "ism_cooling" to true in the input file.
 
 #include <iostream>
 #include <sstream>
 #include <cstdio>
 #include <vector>
 #include <cmath>
+#include <Kokkos_Random.hpp>
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
@@ -115,7 +120,13 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   units::Units my_unit(pin);
 
   // initialize primitive variables
-  if (iprob == 2 || init_file != "none") {
+  if (init_file == "none" && iprob != 1 && iprob != 2) {
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+              << "iprob = " << iprob << " is not 1 or 2, and no init_file is given" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  if (init_file != "none") {
     int Nx1_mesh = pmy_mesh_->mesh_indcs.nx1;
     int Nx2_mesh = pmy_mesh_->mesh_indcs.nx2;
     const int num_vars = 7;
@@ -190,6 +201,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
       }
     });
   } else {
+    Kokkos::Random_XorShift64_Pool<> rand_pool64(pmbp->gids);
     par_for("KHI", DevExeSpace(), 0,(pmbp->nmb_thispack-1),ks,ke,js,je,is,ie,
     KOKKOS_LAMBDA(int m, int k, int j, int i) {
 
@@ -212,6 +224,17 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
           // Adding perturbations to vy. The perturbation is a sum of sine functions with different wavelengths.
           // wavenumbers are k_n = 2n*pi/L_x, where n = 5,10,18,25,32.
           Real perturb = sin(2.0*5.0*M_PI*x1v/L_x)+sin(2.0*10.0*M_PI*x1v/L_x)+sin(2.0*18.0*M_PI*x1v/L_x)+sin(2.0*25.0*M_PI*x1v/L_x)+sin(2.0*32.0*M_PI*x1v/L_x);
+          vy = -amp*2.0*vshear_delta*(perturb)*exp( -SQR((x2v - y_cold)/sigma) );
+          vz = 0.0;
+          scal = y0 - y1*tanh((x2v - y_cold)/a_char);
+      } else if (iprob == 2) {
+          pres = p_in;
+          dens = rho0 - rho1*tanh((x2v - y_cold)/a_char);
+          vx = vshear_half + vshear_delta*tanh((x2v - y_cold)/a_char);            // this makes relative shear velocity = vx_hot - vx_cold.
+          // White noise in vy, uniform in [-0.5, 0.5] and independent in every cell.
+          auto rand_gen = rand_pool64.get_state();
+          Real perturb = rand_gen.frand() - 0.5;
+          rand_pool64.free_state(rand_gen);
           vy = -amp*2.0*vshear_delta*(perturb)*exp( -SQR((x2v - y_cold)/sigma) );
           vz = 0.0;
           scal = y0 - y1*tanh((x2v - y_cold)/a_char);
