@@ -85,6 +85,10 @@ add_executable(
         hydro/hydro_tasks.cpp
         hydro/hydro_update.cpp
 
+        subgrid/subgrid.cpp
+        subgrid/subgrid_eos.cpp
+        subgrid/subgrid_newdt.cpp
+
         ion-neutral/ion-neutral.cpp
         ion-neutral/ion-neutral_tasks.cpp
 

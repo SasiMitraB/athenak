@@ -27,6 +27,7 @@
 
 #include "dyn_grmhd/dyn_grmhd.hpp"
 #include "hydro/hydro.hpp"
+#include "subgrid/subgrid.hpp"
 #include "mhd/mhd.hpp"
 #include "radiation/radiation.hpp"
 #include "coordinates/adm.hpp"
@@ -172,6 +173,9 @@ void MeshRefinement::AdaptiveMeshRefinement(Driver *pdriver, ParameterInput *pin
     }
     if (pmbp->phydro != nullptr) {
       (void) pmbp->phydro->NewTimeStep(pdriver, pdriver->nexp_stages);
+    }
+    if (pmbp->psubgrid != nullptr) {
+      (void) pmbp->psubgrid->NewTimeStep(pdriver, pdriver->nexp_stages);
     }
     if (pmbp->pmhd != nullptr) {
       (void) pmbp->pmhd->NewTimeStep(pdriver, pdriver->nexp_stages);

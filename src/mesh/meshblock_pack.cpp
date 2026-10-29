@@ -28,6 +28,7 @@
 #include "diffusion/resistivity.hpp"
 #include "radiation/radiation.hpp"
 #include "srcterms/turb_driver.hpp"
+#include "subgrid/subgrid.hpp"
 #include "particles/particles.hpp"
 #include "units/units.hpp"
 #include "meshblock_pack.hpp"
@@ -72,6 +73,7 @@ MeshBlockPack::~MeshBlockPack() {
   if (pturb  != nullptr) {delete pturb;}
   if (prad   != nullptr) {delete prad;}
   if (pmhd   != nullptr) {delete pmhd;}
+  if (psubgrid != nullptr) {delete psubgrid;}
   if (phydro != nullptr) {delete phydro;}
   if (punit  != nullptr) {delete punit;}
   delete pcoord;
@@ -126,6 +128,16 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
     }
   } else {
     phydro = nullptr;
+  }
+
+  // (2b) SUBGRID
+  // Adds closure terms of the coarse-grained equations to Hydro by inserting tasks into
+  // the Hydro task list. Requires single-fluid hydro (checked in constructor).
+  if (pin->DoesBlockExist("subgrid")) {
+    psubgrid = new subgrid::Subgrid(this, pin);
+    psubgrid->IncludeSubgridTasks(tl_map);
+  } else {
+    psubgrid = nullptr;
   }
 
   // (3) MHD

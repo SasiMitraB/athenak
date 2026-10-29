@@ -21,6 +21,7 @@
 #include "coordinates/cell_locations.hpp"
 #include "refinement_criteria.hpp"
 #include "hydro/hydro.hpp"
+#include "subgrid/subgrid.hpp"
 #include "mhd/mhd.hpp"
 #include "z4c/z4c.hpp"
 #include "diffusion/viscosity.hpp"
@@ -607,7 +608,12 @@ void Mesh::NewTimeStep(const Real tlim) {
 
   // Hydro timestep
   if (pmb_pack->phydro != nullptr) {
-    dt_cycle = std::min(dt_cycle, (cfl_no)*(pmb_pack->phydro->dtnew) );
+    // with <subgrid>, Subgrid::dtnew replaces the Hydro CFL timestep
+    if (pmb_pack->psubgrid != nullptr) {
+      dt_cycle = std::min(dt_cycle, (cfl_no)*(pmb_pack->psubgrid->dtnew) );
+    } else {
+      dt_cycle = std::min(dt_cycle, (cfl_no)*(pmb_pack->phydro->dtnew) );
+    }
     // source terms timestep
     if (pmb_pack->phydro->psrc != nullptr) {
       dt_cycle = std::min(dt_cycle, (cfl_no)*(pmb_pack->phydro->psrc->dtnew) );

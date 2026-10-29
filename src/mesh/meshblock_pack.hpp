@@ -24,6 +24,7 @@ class MeshBlock;
 class ADM;
 class Tmunu;
 namespace hydro {class Hydro;}
+namespace subgrid {class Subgrid;}
 namespace mhd {class MHD;}
 namespace ion_neutral {class IonNeutral;}
 namespace radiation {class Radiation;}
@@ -65,6 +66,7 @@ class MeshBlockPack {
 
   // physics (controlled by AddPhysics() function in meshblock_pack.cpp)
   hydro::Hydro *phydro=nullptr;
+  subgrid::Subgrid *psubgrid=nullptr;
   mhd::MHD *pmhd=nullptr;
   adm::ADM *padm=nullptr;
   Tmunu *ptmunu=nullptr;

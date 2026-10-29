@@ -20,6 +20,7 @@
 #include "coordinates/coordinates.hpp"
 #include "outputs/outputs.hpp"
 #include "hydro/hydro.hpp"
+#include "subgrid/subgrid.hpp"
 #include "mhd/mhd.hpp"
 #include "z4c/z4c.hpp"
 #include "dyn_grmhd/dyn_grmhd.hpp"
@@ -471,6 +472,9 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout, bool re
   if (time_evolution != TimeEvolution::tstatic) {
     if (phydro != nullptr) {
       (void) pmesh->pmb_pack->phydro->NewTimeStep(this, nexp_stages);
+    }
+    if (pmesh->pmb_pack->psubgrid != nullptr) {
+      (void) pmesh->pmb_pack->psubgrid->NewTimeStep(this, nexp_stages);
     }
     if (pmhd != nullptr) {
       (void) pmesh->pmb_pack->pmhd->NewTimeStep(this, nexp_stages);

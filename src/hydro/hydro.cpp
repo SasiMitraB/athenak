@@ -21,6 +21,7 @@
 #include "shearing_box/orbital_advection.hpp"
 #include "bvals/bvals.hpp"
 #include "hydro/hydro.hpp"
+#include "subgrid/subgrid_eos.hpp"
 
 namespace hydro {
 //----------------------------------------------------------------------------------------
@@ -53,6 +54,8 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
       peos = new IdealSRHydro(ppack, pin);
     } else if (pmy_pack->pcoord->is_general_relativistic) {
       peos = new IdealGRHydro(ppack, pin);
+    } else if (pin->DoesBlockExist("subgrid")) {
+      peos = new SubgridIdealHydro(ppack, pin);
     } else {
       peos = new IdealHydro(ppack, pin);
     }
