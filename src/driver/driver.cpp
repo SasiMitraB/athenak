@@ -464,6 +464,12 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout, bool re
   //---- Step 1.  Set conserved variables in ghost zones for all physics
   InitBoundaryValuesAndPrimitives(pmesh);
 
+  // with <subgrid>, evaluate the closures and recompute w0, so stage 1 starts from a
+  // consistent cache
+  if (pmesh->pmb_pack->psubgrid != nullptr) {
+    pmesh->pmb_pack->psubgrid->EvaluateClosures(this, 0);
+  }
+
   //---- Step 2.  Compute time step (if problem involves time evolution)
   hydro::Hydro *phydro = pmesh->pmb_pack->phydro;
   mhd::MHD *pmhd = pmesh->pmb_pack->pmhd;
@@ -474,7 +480,7 @@ void Driver::Initialize(Mesh *pmesh, ParameterInput *pin, Outputs *pout, bool re
       (void) pmesh->pmb_pack->phydro->NewTimeStep(this, nexp_stages);
     }
     if (pmesh->pmb_pack->psubgrid != nullptr) {
-      (void) pmesh->pmb_pack->psubgrid->NewTimeStep(this, nexp_stages);
+      (void) pmesh->pmb_pack->psubgrid->SubgridNewTimeStep(this, nexp_stages);
     }
     if (pmhd != nullptr) {
       (void) pmesh->pmb_pack->pmhd->NewTimeStep(this, nexp_stages);

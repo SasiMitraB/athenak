@@ -86,8 +86,16 @@ add_executable(
         hydro/hydro_update.cpp
 
         subgrid/subgrid.cpp
-        subgrid/subgrid_eos.cpp
+        subgrid/subgrid_c2p.cpp
+        subgrid/subgrid_divergence.cpp
+        subgrid/subgrid_model.cpp
         subgrid/subgrid_newdt.cpp
+        subgrid/subgrid_predict_c.cpp
+        subgrid/subgrid_predict_ksg.cpp
+        subgrid/subgrid_predict_q.cpp
+        subgrid/subgrid_predict_r.cpp
+        subgrid/subgrid_srcterms.cpp
+        subgrid/subgrid_tasks.cpp
 
         ion-neutral/ion-neutral.cpp
         ion-neutral/ion-neutral_tasks.cpp

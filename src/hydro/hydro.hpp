@@ -109,6 +109,7 @@ class Hydro {
   bool has_sts_viscosity = false;
   bool has_sts_conduction = false;
   bool has_any_sts_diffusion = false;
+  bool has_subgrid = false;  // ConToPrim, NewTimeStep tasks replaced by Subgrid
 
   // Global per-face L/R primitive buffers used by the split-kernel flux path
   // (PLM + LLF|HLLC). Shaped (nmb, nvars, nf3, nf2, nf1) where

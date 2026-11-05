@@ -21,7 +21,6 @@
 #include "shearing_box/orbital_advection.hpp"
 #include "bvals/bvals.hpp"
 #include "hydro/hydro.hpp"
-#include "subgrid/subgrid_eos.hpp"
 
 namespace hydro {
 //----------------------------------------------------------------------------------------
@@ -54,8 +53,6 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
       peos = new IdealSRHydro(ppack, pin);
     } else if (pmy_pack->pcoord->is_general_relativistic) {
       peos = new IdealGRHydro(ppack, pin);
-    } else if (pin->DoesBlockExist("subgrid")) {
-      peos = new SubgridIdealHydro(ppack, pin);
     } else {
       peos = new IdealHydro(ppack, pin);
     }
@@ -77,6 +74,9 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
               << "<hydro>/eos = '" << eqn_of_state << "' not implemented" << std::endl;
     std::exit(EXIT_FAILURE);
   }
+
+  // with <subgrid>, the Subgrid module replaces the ConToPrim and NewTimeStep tasks
+  has_subgrid = pin->DoesBlockExist("subgrid");
 
   // (2) Initialize scalars, diffusion, source terms
   nscalars = pin->GetOrAddInteger("hydro","nscalars",0);

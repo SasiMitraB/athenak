@@ -131,11 +131,11 @@ void MeshBlockPack::AddPhysics(ParameterInput *pin) {
   }
 
   // (2b) SUBGRID
-  // Adds closure terms of the coarse-grained equations to Hydro by inserting tasks into
-  // the Hydro task list. Requires single-fluid hydro (checked in constructor).
+  // Adds closure terms of the coarse-grained equations to Hydro by adding tasks to the
+  // Hydro task list. Requires single-fluid hydro (checked in constructor).
   if (pin->DoesBlockExist("subgrid")) {
     psubgrid = new subgrid::Subgrid(this, pin);
-    psubgrid->IncludeSubgridTasks(tl_map);
+    psubgrid->AssembleSubgridTasks(tl_map);
   } else {
     psubgrid = nullptr;
   }

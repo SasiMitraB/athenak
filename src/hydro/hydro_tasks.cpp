@@ -67,8 +67,12 @@ void Hydro::AssembleHydroTasks(std::map<std::string, std::shared_ptr<TaskList>> 
   id.recvu_shr = tl["stagen"]->AddTask(&Hydro::RecvU_Shr, this, id.sendu_shr);
   id.prol      = tl["stagen"]->AddTask(&Hydro::Prolongate, this, id.recvu_shr);
   id.bcs       = tl["stagen"]->AddTask(&Hydro::ApplyPhysicalBCs, this, id.prol);
-  id.c2p       = tl["stagen"]->AddTask(&Hydro::ConToPrim, this, id.bcs);
-  id.newdt     = tl["stagen"]->AddTask(&Hydro::NewTimeStep, this, id.c2p);
+  // with <subgrid>, ConToPrim and NewTimeStep are replaced by Subgrid tasks added in
+  // Subgrid::AssembleSubgridTasks
+  if (!has_subgrid) {
+    id.c2p     = tl["stagen"]->AddTask(&Hydro::ConToPrim, this, id.bcs);
+    id.newdt   = tl["stagen"]->AddTask(&Hydro::NewTimeStep, this, id.c2p);
+  }
 
   // assemble "after_stagen" task list
   id.csend = tl["after_stagen"]->AddTask(&Hydro::ClearSend, this, none);
