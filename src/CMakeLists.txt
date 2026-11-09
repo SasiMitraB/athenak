@@ -89,6 +89,7 @@ add_executable(
         subgrid/subgrid_c2p.cpp
         subgrid/subgrid_divergence.cpp
         subgrid/subgrid_model.cpp
+        subgrid/subgrid_net.cpp
         subgrid/subgrid_newdt.cpp
         subgrid/subgrid_predict_c.cpp
         subgrid/subgrid_predict_ksg.cpp

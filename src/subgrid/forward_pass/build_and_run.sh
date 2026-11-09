@@ -1,14 +1,16 @@
 #!/bin/bash
-# Export the weights (needs the project venv), configure, build and run the three forward-pass checks.
+# Export the weights of the conserved-variable models (needs the project venv), configure, build
+# and run the three forward-pass checks (gate, cooling, ksg).
 #   ./build_and_run.sh              # Kokkos Serial backend
 #   GPU=1 ./build_and_run.sh        # CUDA, as builds/build_gpu.sh (ARCH=ADA89 by default)
 #   ./build_and_run.sh <cmake flags>  # e.g. -DKokkos_ENABLE_OPENMP=ON
 # SKIP_EXPORT=1 reuses data/.  BUILD_DIR overrides the build directory.
 set -e
 ROOT=/home/sasi/Projects/SubgridCGMModel
-cd $ROOT/models/forward_pass_c
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$HERE"
 if [ -z "$SKIP_EXPORT" ]; then
-  (cd $ROOT && venv/bin/python models/forward_pass_c/export_weights.py)
+  (cd $ROOT && venv/bin/python "$HERE/export_weights.py")
 fi
 BUILD=${BUILD_DIR:-build}
 FLAGS=("$@")
@@ -28,7 +30,7 @@ fi
 cmake -S . -B $BUILD -DCMAKE_BUILD_TYPE=Release "${FLAGS[@]}"
 cmake --build $BUILD -j
 rc=0
-for m in gate cooling rvv; do
+for m in gate cooling ksg; do
   echo "=== $m ==="
   ./$BUILD/${m}_forward || rc=1
 done

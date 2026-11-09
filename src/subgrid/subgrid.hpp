@@ -17,7 +17,7 @@
 //!   PredictKsg: z0 -> f -> k_sg
 //!   PredictR:   z1..z5 -> A -> S -> R = 2 rho k_sg S
 //!   PredictQ:   w -> q, Q = v R + q
-//!   PredictC:   g, z_C -> C
+//!   PredictC:   g (gate network), z_C (from u0, g and f) -> C
 //!   SubgridDivergence: div R, div Q
 //! SubgridConToPrim and SubgridNewTimeStep replace the Hydro ConToPrim and NewTimeStep
 //! tasks in the stage task list. Uniform Cartesian grid and non-relativistic ideal gas
@@ -50,27 +50,20 @@ enum class SubgridModelType {zero, neutral, ml};
 // used to make the training data.
 enum class SubgridStencil {central2};
 
+namespace subgrid {
+struct SubgridNet;  // subgrid_net.hpp
+} // namespace subgrid
+
 //----------------------------------------------------------------------------------------
 //! \struct SubgridModel
-//! \brief one fully connected network, held in device views that are captured by the
-//! Predict kernels. Layer l maps a vector of length nodes(l) to one of length
-//! nodes(l+1); its weights and biases start at the offsets woff(l) and boff(l).
+//! \brief one closure model. For ml models, net holds the stencil network of the Kokkos
+//! forward pass (subgrid/forward_pass/stencil_net.hpp: input standardisation, a stencil^3
+//! conv and dense layers), read from weights_file as written by export_weights.py.
 
 struct SubgridModel {
   SubgridModelType type = SubgridModelType::zero;
   std::string weights_file;
-  int nlayers = 0;
-  int ninputs = 0;
-  int noutputs = 0;
-  DvceArray1D<int> nodes;         // number of nodes in each layer, (nlayers+1)
-  DvceArray1D<int> woff;          // offset of each layer's weights, (nlayers)
-  DvceArray1D<int> boff;          // offset of each layer's biases, (nlayers)
-  DvceArray1D<Real> weights;      // all weights, row-major per layer
-  DvceArray1D<Real> biases;       // all biases
-  DvceArray1D<Real> in_shift;     // input scaling: x_hat = (x - in_shift)/in_scale
-  DvceArray1D<Real> in_scale;
-  DvceArray1D<Real> out_shift;    // output scaling: y = y_hat*out_scale + out_shift
-  DvceArray1D<Real> out_scale;
+  std::shared_ptr<subgrid::SubgridNet> net;  // ml models only
 };
 
 //----------------------------------------------------------------------------------------
@@ -102,7 +95,9 @@ class Subgrid {
   SubgridModel model_ksg;  // z0
   SubgridModel model_r;    // z1..z5
   SubgridModel model_q;    // w
-  SubgridModel model_c;    // g, z_C
+  SubgridModel model_c;    // z_C
+  SubgridModel model_gate; // g, the gate input of model_c (<subgrid>/weights_gate, read
+                           // when model_c = ml)
 
   // parameters
   Real gate_kcut;          // cut wavenumber of the cooling gate

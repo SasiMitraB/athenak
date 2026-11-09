@@ -5,7 +5,11 @@
 //
 // Runs on whatever Kokkos backend it was built with (CUDA/HIP/SYCL/OpenMP/Serial).
 //
-// GPU path (forward_gemm): every layer is a matrix product over all cells,
+// forward() = pad() + layers().  pad() is the training-time padding of one whole grid (the
+// standalone tests); AthenaK fills the padded input Work::xp itself from each MeshBlock and
+// its ghost zones, for a whole MeshBlockPack at once, and calls layers().
+//
+// GPU path (layers_gemm): every layer is a matrix product over all cells,
 //   C (N x M) = act(W^T (N x K) A (K x M) + b),   M = cells, K = fan-in, N = fan-out,
 // with the activations feature-major in global memory (row n holds the M cells; a layer's
 // output stays in L2 for the next one).  A wide layer is one kernel of 128 x 128 (or 64 x 64)
@@ -16,7 +20,7 @@
 // from the standardised, padded inputs.  A narrow layer (n_out <= 8, the output heads) is one
 // thread per cell.
 //
-// Host path (forward_simple): one team per cell, the team's threads split the hidden units.
+// Host path (layers_simple): one team per cell, the team's threads split the hidden units.
 //
 // A model file (written by export_weights.py) holds one input standardisation and one or more
 // networks that see the same padded input (rvv_tensor has separate networks for f and S).
@@ -168,59 +172,86 @@ constexpr bool on_device =
     !Kokkos::SpaceAccessibility<Kokkos::HostSpace,
                                 Kokkos::DefaultExecutionSpace::memory_space>::accessible;
 
-// Work arrays of forward() for one grid: the standardised, padded inputs xp (host path:
-// (z, y, x, c); GPU path: (c, z, y, x)), and on the GPU two activation buffers
-// (max_width x mpad, feature-major) and the padded-grid offset of each cell's stencil corner.
+// Work arrays of the forward pass over nb grids ("blocks") of nz x ny x nx output cells each,
+// every block with its own halo of h = stencil / 2 cells: a block is padded to pz x py x px,
+// and the padded cells of all blocks, p = ((b * pz + iz) * py + iy) * px + ix, number plane.
+//   xp:     the standardised, padded inputs; channel c of padded cell p at xp_index(p, c, ...),
+//           i.e. (b, z, y, x, c) on the host path and (c, b, z, y, x) on the GPU path
+//   corner: padded cell of the stencil corner of each output cell
+//           cell = ((b * nz + iz) * ny + iy) * nx + ix  ->  p of (b, iz, iy, ix)
+//   act:    (GPU) two activation buffers, max_width x mpad, feature-major
+// Outputs are (n_out, nb, nz, ny, nx).  The standalone tests use nb = 1 and fill xp with pad();
+// AthenaK fills xp itself from u0 and its ghost zones (subgrid_predict_ksg.cpp).
 struct Work {
-    int nz = 0, ny = 0, nx = 0, mpad = 0;
+    int nb = 0, nz = 0, ny = 0, nx = 0, h = 0, pz = 0, py = 0, px = 0, n_in = 0, mpad = 0;
+    size_t ncell = 0, plane = 0;
     Vec xp, act[2];
     Kokkos::View<int *> corner;
 };
 
-inline Work make_work(const Model &m, int nz, int ny, int nx) {
-    const int h = m.stencil / 2, py = ny + 2 * h, px = nx + 2 * h;
-    const int ncell = nz * ny * nx;
+// Offset of channel c of padded cell p in Work::xp.
+KOKKOS_INLINE_FUNCTION size_t xp_index(size_t p, int c, size_t plane, int n_in) {
+    return on_device ? (size_t)c * plane + p : p * n_in + c;
+}
+
+inline Work make_work(const Model &m, int nz, int ny, int nx, int nb = 1) {
     Work w;
-    w.nz = nz, w.ny = ny, w.nx = nx;
-    w.xp = Vec("xp", (size_t)(nz + 2 * h) * py * px * m.n_in);
+    w.nb = nb, w.nz = nz, w.ny = ny, w.nx = nx, w.n_in = m.n_in;
+    w.h = m.stencil / 2;
+    w.pz = nz + 2 * w.h, w.py = ny + 2 * w.h, w.px = nx + 2 * w.h;
+    w.ncell = (size_t)nb * nz * ny * nx;
+    w.plane = (size_t)nb * w.pz * w.py * w.px;
+    if (w.plane * m.n_in >= (size_t)1 << 31)
+        throw std::runtime_error("forward pass: padded input too large for int offsets");
+    w.xp = Vec("xp", w.plane * m.n_in);
     if (on_device) {
-        w.mpad = (ncell + M_ALIGN - 1) / M_ALIGN * M_ALIGN;
+        w.mpad = (w.ncell + M_ALIGN - 1) / M_ALIGN * M_ALIGN;
         for (auto &a : w.act) a = Vec("act", (size_t)m.max_width * w.mpad);
-        w.corner = Kokkos::View<int *>("corner", ncell);
-        auto corner = w.corner;
-        Kokkos::parallel_for(
-            "corner", Kokkos::RangePolicy<>(0, ncell), KOKKOS_LAMBDA(const int cell) {
-                const int ix = cell % nx, iy = (cell / nx) % ny, iz = cell / (nx * ny);
-                corner(cell) = (iz * py + iy) * px + ix;
-            });
     }
+    w.corner = Kokkos::View<int *>("corner", w.ncell);
+    auto corner = w.corner;
+    const int pz = w.pz, py = w.py, px = w.px;
+    Kokkos::parallel_for(
+        "corner", Kokkos::RangePolicy<>(0, w.ncell), KOKKOS_LAMBDA(const size_t cell) {
+            const int ix = cell % nx, iy = (cell / nx) % ny, iz = (cell / ((size_t)nx * ny)) % nz;
+            const int b = cell / ((size_t)nx * ny * nz);
+            corner(cell) = (((size_t)b * pz + iz) * py + iy) * px + ix;
+        });
     return w;
+}
+
+// xp from raw x (n_in, nz, ny, nx) of one grid (nb = 1), standardised and padded with the
+// boundaries of the training frames (stencil.pad): periodic in z and x, edge copy in y.
+inline void pad(const Model &m, const Vec &x, Work &work) {
+    if (work.nb != 1) throw std::runtime_error("pad(): one grid only");
+    const int nz = work.nz, ny = work.ny, nx = work.nx, h = work.h, py = work.py, px = work.px;
+    const int n_in = m.n_in;
+    const size_t plane = work.plane;
+    const ConstVec x_mean = m.x_mean, x_std = m.x_std;
+    Vec xp = work.xp;
+    Kokkos::parallel_for(
+        "pad", Kokkos::RangePolicy<>(0, plane * n_in), KOKKOS_LAMBDA(const size_t i) {
+            const size_t p = on_device ? i % plane : i / n_in;
+            const int c = on_device ? i / plane : i % n_in;
+            const int ix = p % px, iy = (p / px) % py, iz = p / ((size_t)px * py);
+            const int sz = ((iz - h) % nz + nz) % nz;         // periodic
+            const int sy = Kokkos::clamp(iy - h, 0, ny - 1);  // edge copy
+            const int sx = ((ix - h) % nx + nx) % nx;         // periodic
+            xp(xp_index(p, c, plane, n_in)) =
+                (x(((size_t)c * nz + sz) * ny * nx + (size_t)sy * nx + sx) - x_mean(c)) / x_std(c);
+        });
 }
 
 // ----------------------------------------------------------------------------- host path
 
 // Simple kernel, one team per cell: the host (Serial/OpenMP) path and a cross-check.
-// x: raw (n_in, nz, ny, nx) on the device.  out: (n_out, nz, ny, nx) on the device, the
-// outputs of net 0 first, then those of net 1.
-inline void forward_simple(const Model &m, const Vec &x, Work &work, Vec &out) {
-    const int nz = work.nz, ny = work.ny, nx = work.nx;
-    const int h = m.stencil / 2, k = m.stencil, n_in = m.n_in;
-    const int pz = nz + 2 * h, py = ny + 2 * h, px = nx + 2 * h;
-    const size_t ncell = (size_t)nz * ny * nx;
-    Vec xp = work.xp;
-
-    // standardise + pad, layout (z, y, x, c) so the stencil sum reads contiguous channels
-    Kokkos::parallel_for(
-        "pad", Kokkos::RangePolicy<>(0, (size_t)pz * py * px), KOKKOS_LAMBDA(const size_t i) {
-            const int ix = i % px, iy = (i / px) % py, iz = i / ((size_t)px * py);
-            const int sz = ((iz - h) % nz + nz) % nz;         // periodic
-            const int sy = Kokkos::clamp(iy - h, 0, ny - 1);  // edge copy
-            const int sx = ((ix - h) % nx + nx) % nx;         // periodic
-            for (int c = 0; c < n_in; ++c)
-                xp(i * n_in + c) =
-                    (x(((size_t)c * nz + sz) * ny * nx + (size_t)sy * nx + sx) - m.x_mean(c)) /
-                    m.x_std(c);
-        });
+// work.xp filled (layout (b, z, y, x, c), so the stencil sum reads contiguous channels).
+// out: (n_out, ncell) on the device, the outputs of net 0 first, then those of net 1.
+inline void layers_simple(const Model &m, Work &work, Vec &out) {
+    const int k = m.stencil, n_in = m.n_in, py = work.py, px = work.px;
+    const size_t ncell = work.ncell;
+    const Vec xp = work.xp;
+    const Kokkos::View<const int *> corner = work.corner;
 
     using Team = Kokkos::TeamPolicy<>::member_type;
     using Scratch = Kokkos::View<Real *, Kokkos::DefaultExecutionSpace::scratch_memory_space,
@@ -233,7 +264,7 @@ inline void forward_simple(const Model &m, const Vec &x, Work &work, Vec &out) {
     Kokkos::parallel_for(
         "mlp", policy, KOKKOS_LAMBDA(const Team &team) {
             const int cell = team.league_rank();
-            const int ix = cell % nx, iy = (cell / nx) % ny, iz = cell / (nx * ny);
+            const size_t c0 = corner(cell);
             Scratch a(team.team_scratch(0), max_width);
             Scratch a2(team.team_scratch(0), max_width);
 
@@ -249,7 +280,7 @@ inline void forward_simple(const Model &m, const Vec &x, Work &work, Vec &out) {
                             for (int dx = 0; dx < k; ++dx) {
                                 const size_t tap = (size_t)((dz * k + dy) * k + dx) * n_in;
                                 const size_t xin =
-                                    (((size_t)(iz + dz) * py + iy + dy) * px + ix + dx) * n_in;
+                                    (c0 + ((size_t)dz * py + dy) * px + dx) * n_in;
                                 for (int c = 0; c < n_in; ++c)
                                     acc += xp(xin + c) * net.w[0]((tap + c) * H0 + o);
                             }
@@ -485,28 +516,9 @@ inline void run_layer(const Layer &L, int M) {
         gemm_layer<64, 4>(L, M);
 }
 
-// xp (n_in, nz + 2h, ny + 2h, nx + 2h): standardised x padded periodic in z, x, edge in y.
-inline void pad_channels(const Model &m, const Vec &x, Work &work) {
-    const int nz = work.nz, ny = work.ny, nx = work.nx;
-    const int h = m.stencil / 2, pz = nz + 2 * h, py = ny + 2 * h, px = nx + 2 * h;
-    const size_t plane = (size_t)pz * py * px;
-    const ConstVec x_mean = m.x_mean, x_std = m.x_std;
-    Vec xp = work.xp;
-    Kokkos::parallel_for(
-        "pad_channels", Kokkos::RangePolicy<>(0, plane * m.n_in), KOKKOS_LAMBDA(const size_t i) {
-            const int c = i / plane, r = i % plane;
-            const int ix = r % px, iy = (r / px) % py, iz = r / (px * py);
-            const int sz = (iz - h + nz) % nz, sx = (ix - h + nx) % nx;
-            const int sy = Kokkos::clamp(iy - h, 0, ny - 1);
-            xp(i) = (x(((size_t)c * nz + sz) * ny * nx + (size_t)sy * nx + sx) - x_mean(c)) /
-                    x_std(c);
-        });
-}
-
-inline void forward_gemm(const Model &m, const Vec &x, Work &work, Vec &out) {
-    const int nz = work.nz, ny = work.ny, nx = work.nx, h = m.stencil / 2;
-    const int ncell = nz * ny * nx, py = ny + 2 * h, px = nx + 2 * h;
-    pad_channels(m, x, work);
+// work.xp filled (layout (c, b, z, y, x)); out as layers_simple.
+inline void layers_gemm(const Model &m, Work &work, Vec &out) {
+    const int ncell = work.ncell, py = work.py, px = work.px;
     int out0 = 0;
     for (int n = 0; n < m.n_nets; ++n) {
         const DeviceNet &net = m.net[n];
@@ -516,7 +528,7 @@ inline void forward_gemm(const Model &m, const Vec &x, Work &work, Vec &out) {
             L.conv = (l == 0);
             if (L.conv) {
                 L.xp = work.xp.data(), L.taps = m.taps.data(), L.corner = work.corner.data();
-                L.plane = (nz + 2 * h) * py * px, L.pyx = py * px, L.px = px;
+                L.plane = work.plane, L.pyx = py * px, L.px = px;
             } else {
                 L.A = work.act[(l - 1) % 2].data(), L.lda = work.mpad;
             }
@@ -535,13 +547,22 @@ inline void forward_gemm(const Model &m, const Vec &x, Work &work, Vec &out) {
     }
 }
 
-// The forward pass: the GEMM kernels on a GPU, the simple kernel on the host.
-// x: raw (n_in, nz, ny, nx); out: (n_out, nz, ny, nx); work: make_work() for this grid.
-inline void forward(const Model &m, const Vec &x, Work &work, Vec &out) {
+// The network on a filled work.xp: the GEMM kernels on a GPU, the simple kernel on the host.
+// out: (n_out, ncell), at least n_out * work.ncell long.
+inline void layers(const Model &m, Work &work, Vec &out) {
+    if (out.size() < (size_t)m.n_out * work.ncell)
+        throw std::runtime_error("forward pass: output buffer too small");
     if constexpr (on_device)
-        forward_gemm(m, x, work, out);
+        layers_gemm(m, work, out);
     else
-        forward_simple(m, x, work, out);
+        layers_simple(m, work, out);
+}
+
+// The forward pass of one grid with the training boundaries.
+// x: raw (n_in, nz, ny, nx); out: (n_out, nz, ny, nx); work: make_work(m, nz, ny, nx).
+inline void forward(const Model &m, const Vec &x, Work &work, Vec &out) {
+    pad(m, x, work);
+    layers(m, work, out);
 }
 
 // ----------------------------------------------------------------------------- test helpers

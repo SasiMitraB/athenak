@@ -5,14 +5,18 @@
 //========================================================================================
 //! \file subgrid_model.cpp
 //! \brief set up of the four closure models: model type per term, and for ml models the
-//! weights, biases and input/output scaling read from file and copied to device.
+//! stencil network (weights and input standardisation) read from file to the device.
 
+#include <exception>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include "athena.hpp"
 #include "parameter_input.hpp"
+#include "globals.hpp"
 #include "subgrid/subgrid.hpp"
+#include "subgrid/subgrid_net.hpp"
 
 namespace subgrid {
 //----------------------------------------------------------------------------------------
@@ -42,16 +46,34 @@ void Subgrid::SetupModel(ParameterInput *pin, const std::string &term,
 
 //----------------------------------------------------------------------------------------
 //! \fn void Subgrid::ReadModelWeights
-//! \brief Reads layers, weights, biases and input/output scaling of one model from
-//! model.weights_file into host views, then deep copies them to device.
-//! Placeholder: no file is read yet, the model has no layers.
+//! \brief Reads the stencil network of one model from model.weights_file (the weights.bin
+//! format of subgrid/forward_pass/stencil_net.hpp, written by export_weights.py) to the
+//! device. Every rank reads the file. The checks of the network's inputs and outputs
+//! against the term it predicts are made by the caller.
 
 void Subgrid::ReadModelWeights(SubgridModel &model) {
-  // TODO: rank 0 reads model.weights_file and MPI_Bcast's, (or every rank reads), fills
-  // host mirrors, then Kokkos::deep_copy host -> device.
-  model.nlayers = 0;
-  model.ninputs = 0;
-  model.noutputs = 0;
+  auto net = std::make_shared<SubgridNet>();
+  try {
+    net->model = sn::load_model(model.weights_file);
+  } catch (const std::exception &e) {
+    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
+              << "cannot read subgrid model '" << model.weights_file << "': " << e.what()
+              << std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+  model.net = net;
+  if (global_variable::my_rank == 0) {
+    const sn::Model &m = net->model;
+    std::cout << "subgrid model " << model.weights_file << ": stencil " << m.stencil
+              << ", " << m.n_in << " inputs, " << m.n_out << " outputs, layers";
+    for (int n = 0; n < m.n_nets; ++n) {
+      for (int l = 0; l < m.net[n].n_layers; ++l) {
+        std::cout << " " << m.net[n].fan_in[l] << "->" << m.net[n].fan_out[l];
+      }
+      if (n + 1 < m.n_nets) std::cout << " |";
+    }
+    std::cout << std::endl;
+  }
   return;
 }
 

@@ -12,11 +12,14 @@
 #include "athena.hpp"
 
 //----------------------------------------------------------------------------------------
-//! \fn Real ISMCoolFn()
-//! \brief SPEX cooling curve, taken from Table 2 of Schure et al, A&A 508, 751 (2009)
+//! \fn Real ISMCoolFnFull()
+//! \brief SPEX cooling curve, taken from Table 2 of Schure et al, A&A 508, 751 (2009),
+//! with Koyama & Inutsuka (2002) below 10^4.2 K and the CGOLS fit above 10^8.15 K, at
+//! every temperature (Lambda_full). ISMCoolFn is this curve cut to the cooling window;
+//! the subgrid cooling correction (subgrid_predict_c.cpp) needs both.
 
 KOKKOS_INLINE_FUNCTION
-Real ISMCoolFn(Real temp) {
+Real ISMCoolFnFull(Real temp) {
   // original data from Shure et al. paper, covers 4.12 < logt < 8.16
   const float lhd[102] = {
       -22.5977, -21.9689, -21.5972, -21.4615, -21.4789, -21.5497, -21.6211, -21.6595,
@@ -34,11 +37,6 @@ Real ISMCoolFn(Real temp) {
       -22.4695, -22.4543, -22.4392, -22.4237, -22.4087, -22.3928};
 
   Real logt = log10(temp);
-
-  // // turn off cooling below in the extreme ends; Not there in the default implementation
-  if (logt <= log10(1.05e4) || logt > log10(0.95e6)) {
-    return 0.0;
-  }
 
   // for temperatures less than 10^4 K, use Koyama & Inutsuka (2002)
   if (logt <= 4.2) {
@@ -61,5 +59,22 @@ Real ISMCoolFn(Real temp) {
   Real dx = logt - x0;
   Real logcool = (lhd[ipps+1]*dx - lhd[ipps]*(dx - 0.04))*25.0;
   return pow(10.0,logcool);
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn Real ISMCoolFn()
+//! \brief the cooling curve ISMCoolFnFull cut to the window 1.05e4 < T <= 0.95e6 K
+//! (Lambda_cut): zero outside it
+
+KOKKOS_INLINE_FUNCTION
+Real ISMCoolFn(Real temp) {
+  Real logt = log10(temp);
+
+  // // turn off cooling below in the extreme ends; Not there in the default
+  // implementation
+  if (logt <= log10(1.05e4) || logt > log10(0.95e6)) {
+    return 0.0;
+  }
+  return ISMCoolFnFull(temp);
 }
 #endif // SRCTERMS_ISMCOOLING_HPP_

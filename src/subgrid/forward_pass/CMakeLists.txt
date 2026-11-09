@@ -10,13 +10,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
-add_subdirectory(/home/sasi/Projects/SubgridCGMModel/athenak/kokkos
-                 ${CMAKE_BINARY_DIR}/kokkos)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../kokkos ${CMAKE_BINARY_DIR}/kokkos)
 
-# gate/cooling/rvv_forward: checks against the JAX references in data/; predict: batch
-# prediction for benchmarking/cpp_backend.py
-foreach(target gate_forward cooling_forward rvv_forward predict)
+# gate/cooling/ksg_forward: checks against the JAX references in data/ (export_weights.py);
+# predict: batch prediction for benchmarking/cpp_backend.py
+foreach(target gate_forward cooling_forward ksg_forward predict)
   add_executable(${target} ${target}.cpp)
   target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_definitions(${target} PRIVATE FP_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data/")
   target_link_libraries(${target} Kokkos::kokkos)
 endforeach()

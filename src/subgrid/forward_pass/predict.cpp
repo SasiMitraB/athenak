@@ -1,16 +1,19 @@
-// Batch prediction with the Kokkos forward passes, for the benchmarks (benchmarking/cpp_backend.py):
+// Batch prediction with the Kokkos forward passes of the conserved-variable models, for the
+// benchmarks (benchmarking/cpp_backend.py):
 //
-//   predict <gate|cooling|rvv> <weights.bin> <in.bin> <out.bin>
+//   predict <gate|cooling|ksg> <weights.bin> <in.bin> <out.bin> [<ksg_weights.bin>]
 //
+// ksg_weights.bin: for a cooling model trained with --ksg-model (23 inputs), the k_sg model
+//          whose log10 f, log10 (1 - f) it takes; run here on the same u0 (model_ops.hpp
+//          cooling_inputs).
 // in.bin:  int32 n_frames, n_chan, nz, ny, nx; float32 x[n_frames][n_chan][nz][ny][nx], the raw
-//          (unnormalised, unpadded) inputs:
-//            gate     6 cached fields (log_rho, log_T, ux, uy, uz, s0); features built here
-//            cooling  the 6 fields plus the gate channel
-//            rvv      log_rho, log_kmax, ux, uy, uz, s0
+//          (unnormalised, unpadded) inputs, the network inputs are built here:
+//            gate, ksg  u0 = rho, m_x, m_y, m_z, E (5 channels)
+//            cooling    u0 plus the gate channel (6)
 // out.bin: int32 n_frames, n_out, nz, ny, nx; float32 y[n_frames][n_out][nz][ny][nx]:
 //            gate     the raw network outputs (logit of the gate, then the f_mix logit if any)
 //            cooling  z
-//            rvv      z_0..z_5, f, S (xx yy zz xy xz yz): 13 channels
+//            ksg      z_0, f, k_sg: 3 channels
 // Prints the mean time per frame of the forward pass on the device (inputs already there) and
 // including the host <-> device copies.
 #include "model_ops.hpp"
@@ -19,11 +22,26 @@
 
 static int run(int argc, char *argv[]) {
     using namespace sn;
-    if (argc != 5) throw std::runtime_error("usage: predict <gate|cooling|rvv> weights.bin in.bin out.bin");
+    if (argc != 5 && argc != 6)
+        throw std::runtime_error("usage: predict <gate|cooling|ksg> weights.bin in.bin out.bin [ksg_weights.bin]");
     const std::string kind = argv[1];
-    if (kind != "gate" && kind != "cooling" && kind != "rvv")
+    if (kind != "gate" && kind != "cooling" && kind != "ksg")
         throw std::runtime_error("unknown model kind " + kind);
     Model m = load_model(argv[2]);
+    const bool cooling = (kind == "cooling"), ksg = (kind == "ksg");
+    const bool with_ksg = cooling && cooling_takes_ksg(m);
+    if (!cooling && m.n_in != N_FEAT)
+        throw std::runtime_error(kind + " model has " + std::to_string(m.n_in) +
+                                 " inputs, not the conserved-variable features");
+    if (ksg) check_ksg(m);
+    if (with_ksg != (argc == 6))
+        throw std::runtime_error(with_ksg ? "this cooling model takes k_sg inputs: give ksg_weights.bin"
+                                          : "ksg_weights.bin given, but the model takes no k_sg inputs");
+    Model mk;
+    if (with_ksg) {
+        mk = load_model(argv[5]);
+        check_ksg(mk);
+    }
 
     std::ifstream f(argv[3], std::ios::binary);
     if (!f) throw std::runtime_error(std::string("cannot open ") + argv[3]);
@@ -31,29 +49,27 @@ static int run(int argc, char *argv[]) {
     read_vec(f, dims, 5);
     const int n_frames = dims[0], n_chan = dims[1], nz = dims[2], ny = dims[3], nx = dims[4];
     const size_t ncell = (size_t)nz * ny * nx;
-    const int want_chan = (kind == "gate") ? N_BASE : m.n_in;
+    const int want_chan = N_U + (cooling ? 1 : 0);
     if (n_chan != want_chan)
         throw std::runtime_error(kind + " expects " + std::to_string(want_chan) + " input channels, got " +
                                  std::to_string(n_chan));
-    if (kind == "gate" && m.n_in != N_FEAT) throw std::runtime_error("gate model must have 24 inputs");
-    if (kind == "rvv" && m.n_out != 6) throw std::runtime_error("rvv model must have 6 outputs");
     std::vector<Real> x_h;
     read_vec(f, x_h, (size_t)n_frames * n_chan * ncell);
 
-    const int n_out = (kind == "rvv") ? 13 : m.n_out;
+    const int n_out = ksg ? 3 : m.n_out;
     std::vector<Real> y_h((size_t)n_frames * n_out * ncell);
 
     Work work = make_work(m, nz, ny, nx);
-    Vec x("x", n_chan * ncell), feat("feat", kind == "gate" ? N_FEAT * ncell : 0);
-    Vec out("out", m.n_out * ncell), fv("f", ncell), S("S", 6 * ncell);
+    Vec x("x", n_chan * ncell), feat("feat", m.n_in * ncell), out("out", m.n_out * ncell);
+    Vec fv("f", ksg ? ncell : 0), kv("k_sg", ksg ? ncell : 0), z0("z0", with_ksg ? ncell : 0);
+    Work ksg_work = with_ksg ? make_work(mk, nz, ny, nx) : Work();
     auto compute = [&]() {
-        if (kind == "gate") {
+        if (cooling)
+            cooling_inputs(x, feat, nz, ny, nx, with_ksg ? &mk : nullptr, &ksg_work, &z0);
+        else
             features(x, feat, nz, ny, nx);
-            forward(m, feat, work, out);
-        } else {
-            forward(m, x, work, out);
-            if (kind == "rvv") shape_from_z(out, fv, S, ncell);
-        }
+        forward(m, feat, work, out);
+        if (ksg) ksg_from_z(out, x, fv, kv, ncell);
     };
 
     double t_compute = 0, t_total = 0;
@@ -70,9 +86,9 @@ static int run(int argc, char *argv[]) {
         const auto t2 = clock::now();
         Real *y = y_h.data() + (size_t)fr * n_out * ncell;
         Kokkos::deep_copy(Vec::host_mirror_type(y, m.n_out * ncell), out);
-        if (kind == "rvv") {
-            Kokkos::deep_copy(Vec::host_mirror_type(y + 6 * ncell, ncell), fv);
-            Kokkos::deep_copy(Vec::host_mirror_type(y + 7 * ncell, 6 * ncell), S);
+        if (ksg) {
+            Kokkos::deep_copy(Vec::host_mirror_type(y + ncell, ncell), fv);
+            Kokkos::deep_copy(Vec::host_mirror_type(y + 2 * ncell, ncell), kv);
         }
         const auto t3 = clock::now();
         if (i >= 0) {
