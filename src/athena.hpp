@@ -8,6 +8,7 @@
 //! \file athena.hpp
 //  \brief contains Athena++ general purpose types, structures, enums, etc.
 
+#include <cfloat>   // FLT_MAX etc. (no longer included by Kokkos 5)
 #include <string>
 #include <cstdint>
 

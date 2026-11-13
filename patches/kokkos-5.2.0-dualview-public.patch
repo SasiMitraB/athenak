@@ -1,0 +1,13 @@
+diff --git a/containers/src/Kokkos_DualView.hpp b/containers/src/Kokkos_DualView.hpp
+index e8ca89e94..a7662569f 100644
+--- a/containers/src/Kokkos_DualView.hpp
++++ b/containers/src/Kokkos_DualView.hpp
+@@ -187,7 +187,7 @@ class DualView : public ViewTraits<DataType, Properties...> {
+       std::is_same_v<typename t_dev::device_type, typename t_host::device_type>;
+   //@}
+ 
+- private:
++ public:  // AthenaK: keep pre-5.2 public access to d_view/h_view (see kokkos#7716, #8980)
+   // Moved this specifically after modified_flags to resolve an alignment issue
+   // on MSVC/NVCC
+   //! \name The two View instances.

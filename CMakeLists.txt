@@ -10,12 +10,9 @@ if( "${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}" )
   message(FATAL_ERROR "FATAL: In-source builds disabled. Please create a separate build directory in which to run cmake, e.g. mkdir build; cd build; cmake ../" )
 endif()
 
-# Athena++ (and Kokkos) require C++17 standard as minimum
-set(CMAKE_CXX_STANDARD 17)
+# Kokkos 5.x requires the C++20 standard as minimum
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Force flag to denote C++ standard, as deprecated c++1z is not supported by nvcc.
-set(CMAKE_CXX17_STANDARD_COMPILE_OPTION "-std=c++17")
 
 # Kokkos recommends NOT using default compiler extensions
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -34,7 +31,45 @@ endif()
 option(Athena_SINGLE_PRECISION "Compile for single precision" OFF)
 option(Athena_ENABLE_MPI "Compile with MPI parallelism enabled" OFF)
 option(Athena_ENABLE_OPENMP "Compile with OpenMP parallelism enabled" OFF)
+option(Athena_ENABLE_ACPP_METAL
+  "Build for Apple GPUs: Kokkos SYCL backend compiled with AdaptiveCpp (Metal)" OFF)
 set(PROBLEM built_in_pgens CACHE STRING "Name of problem generator function")
+
+#------ local patches to the Kokkos 5.2.0 submodule (see patches/README.md) -----------
+
+# apply a patch to kokkos/ once (skip if it is already applied)
+function(athena_apply_kokkos_patch patch)
+  set(_p ${CMAKE_CURRENT_SOURCE_DIR}/patches/${patch})
+  execute_process(COMMAND git apply --reverse --check ${_p}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kokkos
+    RESULT_VARIABLE _applied OUTPUT_QUIET ERROR_QUIET)
+  if (NOT _applied EQUAL 0)
+    message(STATUS "Applying patches/${patch} to kokkos/")
+    execute_process(COMMAND git apply ${_p}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kokkos
+      RESULT_VARIABLE _rc)
+    if (NOT _rc EQUAL 0)
+      message(FATAL_ERROR "Could not apply patches/${patch}; is kokkos/ at tag 5.2.0?")
+    endif()
+  endif()
+endfunction()
+
+# Kokkos 5.2 made DualView::d_view/h_view private; keep them public for AthenaK
+athena_apply_kokkos_patch(kokkos-5.2.0-dualview-public.patch)
+# keep View::HostMirror (removal deferred to Kokkos 5.3)
+set(Kokkos_ENABLE_DEPRECATED_CODE_4 ON CACHE BOOL "Keep Kokkos code deprecated in 4.x")
+
+#------ Apple GPU (Metal) via Kokkos SYCL + AdaptiveCpp -------------------------------
+# Follows kokkos/kokkos#9750 and the scaluq F2 report; see patches/README.md.
+# Configure with -DCMAKE_CXX_COMPILER=<prefix>/bin/acpp. Apple GPUs have no fp64.
+if (Athena_ENABLE_ACPP_METAL)
+  set(Athena_SINGLE_PRECISION ON CACHE BOOL "Compile for single precision" FORCE)
+  set(Kokkos_ENABLE_SYCL ON CACHE BOOL "Compile Kokkos with SYCL")
+  set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "Compile Kokkos with Serial")
+  set(Kokkos_ENABLE_ONEDPL OFF CACHE BOOL "oneDPL is DPC++ only")
+  set(Kokkos_IMPL_SYCL_ACPP ON CACHE BOOL "Kokkos SYCL backend built by AdaptiveCpp")
+  athena_apply_kokkos_patch(kokkos-5.2.0-acpp-metal.patch)
+endif()
 
 #------ set macros exported to config.hpp ------------------------------------------------
 
