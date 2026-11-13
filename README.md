@@ -12,11 +12,23 @@ the patches from the scaluq team's investigation
 Apple GPUs have no fp64 arithmetic, so GPU runs use **single precision**.
 
 **Status:** hydrodynamics with WENO-Z reconstruction and the HLLC Riemann solver runs on
-an Apple M4 GPU. Two Kelvin-Helmholtz tests were verified:
-- `kh2d-sin`, 256×256: about 1.5×10⁷ zone-cycles/s, roughly 11× one CPU core in fp64.
-- `kh2d-single` (one shear layer, density contrast 1:2): agrees point by point with the
-  fp64 CPU run to about 2×10⁻⁴, and its linear growth rate matches theory for a tanh
-  shear layer.
+an Apple M4 GPU. Two Kelvin-Helmholtz tests were verified. Each animation below shows the
+density in three runs side by side: M4 GPU (fp32), CPU (fp32) and CPU (fp64).
+
+**`kh2d-sin`** (256×256, random velocity perturbations, run to t = 10): about 1.5×10⁷
+zone-cycles/s, roughly 11× one CPU core in fp64. Mass and energy are conserved to about
+4×10⁻⁵. The GPU pattern differs from the CPU ones because the GPU random-number pool
+assigns states in a different order, so the initial perturbation differs. The two CPU
+runs stay nearly identical.
+
+![kh2d-sin density, GPU vs CPU](docs/metal/kh2d-sin_t10.gif)
+
+**`kh2d-single`** (one shear layer, density 1 below and 2 above, single-mode
+perturbation, run to t = 5): the GPU run agrees point by point with the fp64 CPU run to
+about 2×10⁻⁴, as closely as the fp32 CPU run does. The measured linear growth rate,
+σ ≈ 1.7, matches theory for a tanh shear layer of this thickness.
+
+![kh2d-single density, GPU vs CPU](docs/metal/kh2d-single.gif)
 
 The default fp64 CPU build is unaffected: the CPU test suite passes (225 passed, 15
 skipped), and so do the style checks. The build recipe, run instructions and known
