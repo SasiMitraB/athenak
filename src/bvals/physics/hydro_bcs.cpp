@@ -105,7 +105,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
         case BoundaryFlag::diode:
           for (int i=0; i<ng; ++i) {
             if (n==(IVX)) {
-              u0(m,n,k,j,is-i-1) = fmin(0.0,u0(m,n,k,j,is));
+              u0(m,n,k,j,is-i-1) = fmin(Real(0.0),u0(m,n,k,j,is));
             } else {
               u0(m,n  ,k,j,is-i-1) = u0(m,n,k,j,is);
             }
@@ -113,7 +113,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
           break;
         case BoundaryFlag::vacuum:
           for (int i=0; i<ng; ++i) {
-            u0(m,n,k,j,is-i-1) = 0.0;
+            u0(m,n,k,j,is-i-1) = Real(0.0);
           }
           break;
         default:
@@ -144,7 +144,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
         case BoundaryFlag::diode:
           for (int i=0; i<ng; ++i) {
             if (n==(IVX)) {
-              u0(m,n,k,j,ie+i+1) = fmax(0.0,u0(m,n,k,j,ie));
+              u0(m,n,k,j,ie+i+1) = fmax(Real(0.0),u0(m,n,k,j,ie));
             } else {
               u0(m,n  ,k,j,ie+i+1) = u0(m,n,k,j,ie);
             }
@@ -152,7 +152,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
           break;
         case BoundaryFlag::vacuum:
           for (int i=0; i<ng; ++i) {
-            u0(m,n,k,j,ie+i+1) = 0.0;
+            u0(m,n,k,j,ie+i+1) = Real(0.0);
           }
           break;
         default:
@@ -191,7 +191,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
         case BoundaryFlag::diode:
           for (int j=0; j<ng; ++j) {
             if (n==(IVY)) {
-              u0(m,n,k,js-j-1,i) = fmin(0.0,u0(m,n,k,js,i));
+              u0(m,n,k,js-j-1,i) = fmin(Real(0.0),u0(m,n,k,js,i));
             } else {
               u0(m,n,k,js-j-1,i) = u0(m,n,k,js,i);
             }
@@ -199,7 +199,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
           break;
         case BoundaryFlag::vacuum:
           for (int j=0; j<ng; ++j) {
-            u0(m,n,k,js-j-1,i) = 0.0;
+            u0(m,n,k,js-j-1,i) = Real(0.0);
           }
           break;
         default:
@@ -230,7 +230,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
         case BoundaryFlag::diode:
           for (int j=0; j<ng; ++j) {
             if (n==(IVY)) {
-              u0(m,n,k,je+j+1,i) = fmax(0.0,u0(m,n,k,je,i));
+              u0(m,n,k,je+j+1,i) = fmax(Real(0.0),u0(m,n,k,je,i));
             } else {
               u0(m,n,k,je+j+1,i) = u0(m,n,k,je,i);
             }
@@ -238,7 +238,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
           break;
         case BoundaryFlag::vacuum:
           for (int j=0; j<ng; ++j) {
-            u0(m,n,k,je+j+1,i) = 0.0;
+            u0(m,n,k,je+j+1,i) = Real(0.0);
           }
           break;
         default:
@@ -276,7 +276,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
       case BoundaryFlag::diode:
         for (int k=0; k<ng; ++k) {
           if (n==(IVZ)) {
-            u0(m,n,ks-k-1,j,i) = fmin(0.0,u0(m,n,ks,j,i));
+            u0(m,n,ks-k-1,j,i) = fmin(Real(0.0),u0(m,n,ks,j,i));
           } else {
             u0(m,n,ks-k-1,j,i) = u0(m,n,ks,j,i);
           }
@@ -284,7 +284,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
         break;
       case BoundaryFlag::vacuum:
         for (int k=0; k<ng; ++k) {
-          u0(m,n,ks-k-1,j,i) = 0.0;
+          u0(m,n,ks-k-1,j,i) = Real(0.0);
         }
         break;
       default:
@@ -315,7 +315,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
       case BoundaryFlag::diode:
         for (int k=0; k<ng; ++k) {
           if (n==(IVZ)) {
-            u0(m,n,ke+k+1,j,i) = fmax(0.0,u0(m,n,ke,j,i));
+            u0(m,n,ke+k+1,j,i) = fmax(Real(0.0),u0(m,n,ke,j,i));
           } else {
             u0(m,n,ke+k+1,j,i) = u0(m,n,ke,j,i);
           }
@@ -323,7 +323,7 @@ void BCHelperHydro(MeshBlockPack *ppack, DualArray2D<Real> u_in, DvceArray5D<Rea
         break;
       case BoundaryFlag::vacuum:
         for (int k=0; k<ng; ++k) {
-          u0(m,n,ke+k+1,j,i) = 0.0;
+          u0(m,n,ke+k+1,j,i) = Real(0.0);
         }
         break;
       default:

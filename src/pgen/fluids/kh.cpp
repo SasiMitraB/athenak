@@ -6,7 +6,8 @@
 //! \file kh.cpp
 //  \brief Problem generator for KH instability
 //  Sets up different initial conditions selected by flag "iprob"
-//    - iprob=1 : tanh profile with a single mode perturbation
+//    - iprob=1 : tanh profile with a single mode perturbation; optional density
+//                contrast rho_bot (x2<0) / rho_top (x2>0)
 //    - iprob=2 : double tanh profile with a single mode perturbation
 //    - iprob=3 : sinusoidal velocity with random perturbations
 //    - iprob=4 : Lecoanet test problem ICs
@@ -48,6 +49,8 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Real y1    = pin->GetOrAddReal("problem","y1",1.0);
   Real p_in  = pin->GetOrAddReal("problem","press",1.0);
   Real drho_rho0 = pin->GetOrAddReal("problem", "drho_rho0", 0.0);
+  Real rho_bot = pin->GetOrAddReal("problem", "rho_bot", 1.0);  // iprob=1, x2 < 0
+  Real rho_top = pin->GetOrAddReal("problem", "rho_top", 1.0);  // iprob=1, x2 > 0
 
   //user_hist_func = KHHistory;
 
@@ -116,7 +119,9 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
 
     if (iprob == 1) {
       pres = 20.0;
-      dens = 1.0;
+      // optional density contrast across the shear layer (defaults: uniform dens = 1)
+      dens = Real(0.5)*(rho_top + rho_bot)
+           + Real(0.5)*(rho_top - rho_bot)*tanh(x2v/sigma);
       vx = -vshear*tanh(x2v/sigma);
       vy = -amp*vshear*sin(Real(2.)*Real(M_PI)*x1v)*exp( -SQR(x2v/sigma) );
       vz = 0.0;

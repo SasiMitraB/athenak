@@ -1,0 +1,66 @@
+# Athena++ (Kokkos version) input file for hydro KH test:
+# a single shear layer between two fluids of different density
+
+<comment>
+problem   = Kelvin-Helmholtz instability, single shear layer with density contrast
+reference = Chandrasekhar (1961), Hydrodynamic and Hydromagnetic Stability, ch. XI
+
+<job>
+basename  = KH1         # problem ID: basename of output filenames
+
+<mesh>
+nghost    = 3
+nx1       = 128         # Number of zones in X1-direction
+x1min     = -0.5        # minimum value of X1
+x1max     =  0.5        # maximum value of X1
+ix1_bc    = periodic    # inner-X1 boundary flag
+ox1_bc    = periodic    # outer-X1 boundary flag
+
+nx2       = 256         # Number of zones in X2-direction
+x2min     = -1.0        # minimum value of X2
+x2max     =  1.0        # maximum value of X2
+ix2_bc    = reflect     # reflecting walls: no second shear layer across the boundary
+ox2_bc    = reflect     # outer-X2 boundary flag
+
+nx3       = 1           # Number of zones in X3-direction
+x3min     = -0.5        # minimum value of X3
+x3max     = 0.5         # maximum value of X3
+ix3_bc    = periodic    # inner-X3 boundary flag
+ox3_bc    = periodic    # outer-X3 boundary flag
+
+<meshblock>
+nx1       = 128         # Number of cells in each MeshBlock, X1-dir
+nx2       = 256         # Number of cells in each MeshBlock, X2-dir
+nx3       = 1           # Number of cells in each MeshBlock, X3-dir
+
+<time>
+evolution  = dynamic    # dynamic/kinematic/static
+integrator = rk3        # time integration algorithm
+cfl_number = 0.4        # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = 100000     # cycle limit
+tlim       = 5.0        # time limit
+ndiag      = 100        # cycles between diagostic output
+
+<hydro>
+eos         = ideal     # EOS type
+reconstruct = wenoz     # spatial reconstruction method
+rsolver     = hllc      # Riemann-solver to be used
+nscalars    = 1         # passive scalar marks the upper fluid
+gamma       = 1.666667  # gamma = C_p/C_v
+
+<problem>
+iprob   = 1             # single tanh shear layer, single-mode perturbation
+vshear  = 0.5           # vx = -vshear*tanh(y/sigma): +0.5 below, -0.5 above
+sigma   = 0.05          # thickness of the shear and density layers
+amp     = 0.01          # amplitude of the sinusoidal vy perturbation
+rho_bot = 1.0           # density below the interface (pressure is uniform, p=20)
+rho_top = 2.0           # density above the interface
+
+<output1>
+file_type  = hst        # History data dump
+dt         = 0.025      # time increment between outputs
+
+<output2>
+file_type  = vtk        # Binary data dump
+variable   = hydro_w    # variables to be output
+dt         = 0.025      # time increment between outputs
