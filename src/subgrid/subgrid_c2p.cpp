@@ -22,10 +22,11 @@ namespace subgrid {
 //!
 //! Each cell is converted by Hydro's own SingleC2P_IdealHyd on the state
 //! (rho, m, E - K), K = rho k_sg the subgrid kinetic energy density from the cache
-//! (PredictKsg, from the same u0). Where a floor resets the energy, u0(IEN) is set to the
-//! floored E - K plus K: the subgrid energy is kept and only the thermal part is raised.
+//! (PredictClosures, from the same u0). Where a floor resets the energy, u0(IEN) is set
+//! to the floored E - K plus K: the subgrid energy is kept and only the thermal part is
+//! raised.
 //! The cached k_sg is not updated after a floor, so there k_sg != f k_max of the new u0
-//! until the next PredictKsg. With k_sg = 0 this is Hydro's ConToPrim bit for bit.
+//! until the next PredictClosures. With k_sg = 0 this is Hydro's ConToPrim bit for bit.
 
 TaskStatus Subgrid::SubgridConToPrim(Driver *pdrive, int stage) {
   auto &indcs = pmy_pack->pmesh->mb_indcs;

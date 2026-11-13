@@ -7,11 +7,14 @@
 //! \brief implementation of Subgrid class constructor and destructor
 
 #include <iostream>
+#include <map>
+#include <memory>
 #include <string>
 #include <algorithm>
 #include <limits>
 
 #include "athena.hpp"
+#include "globals.hpp"
 #include "parameter_input.hpp"
 #include "coordinates/coordinates.hpp"
 #include "mesh/mesh.hpp"
@@ -19,7 +22,7 @@
 #include "hydro/hydro.hpp"
 #include "srcterms/srcterms.hpp"
 #include "subgrid/subgrid.hpp"
-#include "subgrid/subgrid_net.hpp"
+#include "subgrid/subgrid_python.hpp"
 
 namespace subgrid {
 //----------------------------------------------------------------------------------------
@@ -98,28 +101,45 @@ Subgrid::Subgrid(MeshBlockPack *ppack, ParameterInput *pin) :
     std::exit(EXIT_FAILURE);
   }
 
-  // (3) Set up the models (type per term, weights read for ml models)
+  // (3) Set up the models (type per term, model file for ml models), then the Python
+  // predictor that runs them (subgrid_predict.py), which loads the trained JAX models of
+  // <project>/models/conserved from their pickles
   SetupModel(pin, "ksg", model_ksg);
   SetupModel(pin, "r", model_r);
   SetupModel(pin, "q", model_q);
   SetupModel(pin, "c", model_c);
-
-  // (4) Check the k_sg model. k_sg has no neutral output (f = 0 is set directly by zero).
-  if (model_ksg.type == SubgridModelType::neutral) {
-    std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__ << std::endl
-              << "<subgrid>/model_ksg = neutral is not defined, use zero or ml"
-              << std::endl;
-    std::exit(EXIT_FAILURE);
+  if (model_c.type == SubgridModelType::ml) {
+    model_gate.type = SubgridModelType::ml;
+    // default (empty): the gate model the cooling model was trained with
+    model_gate.weights_file = pin->GetOrAddString("subgrid","weights_gate","");
   }
-  if (model_ksg.type == SubgridModelType::ml) {
-    const sn::Model &m = model_ksg.net->model;
-    if (m.n_in != sn::N_FEAT || m.n_out != 1) {
-      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                << std::endl << "<subgrid>/weights_ksg must have " << sn::N_FEAT
-                << " inputs and 1 output, but has " << m.n_in << " and " << m.n_out
-                << std::endl;
-      std::exit(EXIT_FAILURE);
+  auto type_name = [](SubgridModelType t) -> std::string {
+    return (t == SubgridModelType::zero) ? "zero" :
+           (t == SubgridModelType::neutral) ? "neutral" : "ml";
+  };
+  std::map<std::string, std::string> config;
+  for (const auto &p : {std::make_pair("ksg", &model_ksg), std::make_pair("r", &model_r),
+                  std::make_pair("q", &model_q), std::make_pair("c", &model_c),
+                  std::make_pair("gate", &model_gate)}) {
+    const std::string term = p.first;
+    if (term != "gate") config["model_" + term] = type_name(p.second->type);
+    if (p.second->type == SubgridModelType::ml) {
+      config["weights_" + term] = p.second->weights_file;
     }
+  }
+  // where models/ is imported from (default: the project that holds athenak)
+  config["models_path"] = pin->GetOrAddString("subgrid","models_path","");
+  std::string script = pin->GetOrAddString("subgrid","python_script",
+                                           SUBGRID_PYTHON_SCRIPT);
+  std::string executable = pin->GetOrAddString("subgrid","python_executable",
+                                               SUBGRID_PYTHON_EXECUTABLE);
+  ppredict = std::make_unique<PythonPredictor>(script, executable, config);
+  if (global_variable::my_rank == 0 && !ppredict->description.empty()) {
+    std::cout << ppredict->description << std::endl;
+  }
+
+  // (4) The k_sg model
+  if (model_ksg.type == SubgridModelType::ml) {
     if (!(pmy_pack->pmesh->three_d)) {
       std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
                 << std::endl << "<subgrid>/model_ksg = ml needs a 3D mesh (the network "
@@ -134,45 +154,41 @@ Subgrid::Subgrid(MeshBlockPack *ppack, ParameterInput *pin) :
     int nrecon = (phyd->recon_method == ReconstructionMethod::dc) ? 1 :
                  (phyd->recon_method == ReconstructionMethod::plm) ? 2 : 3;
     if (phyd->use_fofc) nrecon += 1;
-    int reach = m.stencil/2 + stencil_width;
+    int reach = ppredict->stencil_ksg/2 + stencil_width;
     if (indcs.ng < nrecon + reach) {
       std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
-                << std::endl << "<subgrid>/model_ksg = ml (stencil " << m.stencil
-                << ", gradient stencil " << stencil_str << ") with this reconstruction "
-                << "requires at least " << nrecon + reach << " ghost zones (" << nrecon
-                << " read by the reconstruction + " << reach << " for the model "
-                << "inputs), but <mesh>/nghost=" << indcs.ng << std::endl;
+                << std::endl << "<subgrid>/model_ksg = ml (stencil "
+                << ppredict->stencil_ksg << ", gradient stencil " << stencil_str
+                << ") with this reconstruction requires at least " << nrecon + reach
+                << " ghost zones (" << nrecon << " read by the reconstruction + " << reach
+                << " for the model inputs), but <mesh>/nghost=" << indcs.ng << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+  }
+
+  // (4b) The R and Q models: R and Q are needed in 1 ghost layer (for div R, div Q), so
+  // their network inputs are read out to 1 + stencil/2 ghost layers, each with its
+  // gradient stencil
+  for (const auto &p : {std::make_pair("r", ppredict->stencil_r),
+                        std::make_pair("q", ppredict->stencil_q)}) {
+    const int need = 1 + p.second/2 + stencil_width;
+    if (p.second > 0 && indcs.ng < need) {
+      std::cout << "### FATAL ERROR in " << __FILE__ << " at line " << __LINE__
+                << std::endl << "<subgrid>/model_" << p.first << " = ml (stencil "
+                << p.second << ") requires at least " << need << " ghost zones, but "
+                << "<mesh>/nghost=" << indcs.ng << std::endl;
       std::exit(EXIT_FAILURE);
     }
   }
 
   // (5) The cooling model: z_C from the 20 features, the gate of a gate network and, if
-  // it was trained with --ksg-model (23 inputs), log10 f and log10 (1 - f) of
-  // PredictKsg's f. Its second term cancels Hydro's ISM cooling, in physical units.
+  // it was trained with --ksg-model (23 inputs), log10 f and log10 (1 - f) of the k_sg
+  // model's f. Its second term cancels Hydro's ISM cooling, in physical units.
   if (model_c.type == SubgridModelType::ml) {
     auto fatal = [](const std::string &msg) {
       std::cout << "### FATAL ERROR in " << __FILE__ << std::endl << msg << std::endl;
       std::exit(EXIT_FAILURE);
     };
-    model_gate.type = SubgridModelType::ml;
-    model_gate.weights_file = pin->GetString("subgrid","weights_gate");
-    ReadModelWeights(model_gate);
-    const sn::Model &mc = model_c.net->model, &mg = model_gate.net->model;
-    if ((mc.n_in != sn::N_COOL_IN && mc.n_in != sn::N_COOL_IN_KSG) || mc.n_out != 1) {
-      fatal("<subgrid>/weights_c must have " + std::to_string(sn::N_COOL_IN) + " or " +
-            std::to_string(sn::N_COOL_IN_KSG) + " inputs and 1 output, but has " +
-            std::to_string(mc.n_in) + " and " + std::to_string(mc.n_out));
-    }
-    if (mg.n_in != sn::N_FEAT || mg.n_out < 1) {
-      fatal("<subgrid>/weights_gate must have " + std::to_string(sn::N_FEAT) +
-            " inputs and its logit as output 0, but has " + std::to_string(mg.n_in) +
-            " inputs and " + std::to_string(mg.n_out) + " outputs");
-    }
-    const bool with_ksg = (mc.n_in == sn::N_COOL_IN_KSG);
-    if (with_ksg && model_ksg.type != SubgridModelType::ml) {
-      fatal("<subgrid>/weights_c takes the k_sg inputs log10 f, log10 (1 - f), which "
-            "need <subgrid>/model_ksg = ml");
-    }
     if (!(pmy_pack->pmesh->three_d)) {
       fatal("<subgrid>/model_c = ml needs a 3D mesh (the networks are 3D stencils)");
     }
@@ -187,13 +203,13 @@ Subgrid::Subgrid(MeshBlockPack *ppack, ParameterInput *pin) :
     // the cooling network reads the gate, and f, out to stencil/2 ghost layers, where
     // they are exact only if the inputs of their own networks are (reach = stencil/2 +
     // stencil_width ghost layers of u0 beyond)
-    const int hc = mc.stencil/2;
-    int need = hc + mg.stencil/2 + stencil_width;
-    if (with_ksg) {
-      need = std::max(need, hc + model_ksg.net->model.stencil/2 + stencil_width);
+    const int hc = ppredict->stencil_c/2;
+    int need = hc + ppredict->stencil_gate/2 + stencil_width;
+    if (ppredict->c_with_ksg) {
+      need = std::max(need, hc + ppredict->stencil_ksg/2 + stencil_width);
     }
     if (indcs.ng < need) {
-      fatal("<subgrid>/model_c = ml (stencil " + std::to_string(mc.stencil) +
+      fatal("<subgrid>/model_c = ml (stencil " + std::to_string(ppredict->stencil_c) +
             ") requires at least " + std::to_string(need) + " ghost zones for exact "
             "gate and k_sg inputs, but <mesh>/nghost=" + std::to_string(indcs.ng));
     }

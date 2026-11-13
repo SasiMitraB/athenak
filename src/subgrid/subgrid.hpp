@@ -12,13 +12,14 @@
 //!   d_t m + div( m m/rho + P I ) = -div R
 //!   d_t E + div( (E + P) v )     = -div Q - C  + (Hydro source terms)
 //!
-//! with e_int = E - 1/2 m^2/rho - rho k_sg. The closures are predicted each stage, in
-//! this order, from u0 (including ghost zones):
-//!   PredictKsg: z0 -> f -> k_sg
-//!   PredictR:   z1..z5 -> A -> S -> R = 2 rho k_sg S
-//!   PredictQ:   w -> q, Q = v R + q
-//!   PredictC:   g (gate network), z_C (from u0, g and f) -> C
-//!   SubgridDivergence: div R, div Q
+//! with e_int = E - 1/2 m^2/rho - rho k_sg. The closures are predicted each stage from u0
+//! (including ghost zones) by the Python models of subgrid_predict.py, run by the one
+//! task PredictClosures through an embedded interpreter (subgrid_python.cpp):
+//!   k_sg: z0 -> f -> k_sg
+//!   R:    z1..z5 -> A -> S -> R = 2 rho k_sg S
+//!   Q:    w -> q, Q = v R + q
+//!   C:    g (gate network), z_C (from u0, g and f) -> C
+//! then SubgridDivergence: div R, div Q
 //! SubgridConToPrim and SubgridNewTimeStep replace the Hydro ConToPrim and NewTimeStep
 //! tasks in the stage task list. Uniform Cartesian grid and non-relativistic ideal gas
 //! Hydro only.
@@ -51,19 +52,17 @@ enum class SubgridModelType {zero, neutral, ml};
 enum class SubgridStencil {central2};
 
 namespace subgrid {
-struct SubgridNet;  // subgrid_net.hpp
+class PythonPredictor;  // subgrid_python.hpp
 } // namespace subgrid
 
 //----------------------------------------------------------------------------------------
 //! \struct SubgridModel
-//! \brief one closure model. For ml models, net holds the stencil network of the Kokkos
-//! forward pass (subgrid/forward_pass/stencil_net.hpp: input standardisation, a stencil^3
-//! conv and dense layers), read from weights_file as written by export_weights.py.
+//! \brief one closure model. For ml models, weights_file is the pickle of the trained JAX
+//! model (<project>/models/conserved/<kind>_model.py), which subgrid_predict.py loads.
 
 struct SubgridModel {
   SubgridModelType type = SubgridModelType::zero;
-  std::string weights_file;
-  std::shared_ptr<subgrid::SubgridNet> net;  // ml models only
+  std::string weights_file;  // ml models only
 };
 
 //----------------------------------------------------------------------------------------
@@ -72,10 +71,7 @@ struct SubgridModel {
 
 struct SubgridTaskIDs {
   TaskID srctrms;
-  TaskID ksg;
-  TaskID rsg;
-  TaskID qsg;
-  TaskID csg;
+  TaskID predict;
   TaskID div;
   TaskID c2p;
   TaskID newdt;
@@ -96,8 +92,9 @@ class Subgrid {
   SubgridModel model_r;    // z1..z5
   SubgridModel model_q;    // w
   SubgridModel model_c;    // z_C
-  SubgridModel model_gate; // g, the gate input of model_c (<subgrid>/weights_gate, read
-                           // when model_c = ml)
+  SubgridModel model_gate; // g, the gate input of model_c (<subgrid>/weights_gate,
+                           // default the gate model model_c was trained with)
+  std::unique_ptr<PythonPredictor> ppredict;  // runs the models (subgrid_predict.py)
 
   // parameters
   Real gate_kcut;          // cut wavenumber of the cooling gate
@@ -122,16 +119,13 @@ class Subgrid {
   void AssembleSubgridTasks(std::map<std::string, std::shared_ptr<TaskList>> tl);
   // ...in "stagen_tl" list
   TaskStatus SubgridSrcTerms(Driver *d, int stage);
-  TaskStatus PredictKsg(Driver *d, int stage);
-  TaskStatus PredictR(Driver *d, int stage);
-  TaskStatus PredictQ(Driver *d, int stage);
-  TaskStatus PredictC(Driver *d, int stage);
+  TaskStatus PredictClosures(Driver *d, int stage);
   TaskStatus SubgridDivergence(Driver *d, int stage);
   TaskStatus SubgridConToPrim(Driver *d, int stage);
   TaskStatus SubgridNewTimeStep(Driver *d, int stage);
 
-  // runs the Predict chain and SubgridConToPrim. Used in Driver::Initialize so that
-  // stage 1 starts from a consistent cache and w0.
+  // runs PredictClosures, SubgridDivergence and SubgridConToPrim. Used in
+  // Driver::Initialize so that stage 1 starts from a consistent cache and w0.
   void EvaluateClosures(Driver *d, int stage);
 
  private:
@@ -139,7 +133,6 @@ class Subgrid {
 
   // model setup (subgrid_model.cpp)
   void SetupModel(ParameterInput *pin, const std::string &term, SubgridModel &model);
-  void ReadModelWeights(SubgridModel &model);
 };
 
 } // namespace subgrid

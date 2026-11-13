@@ -118,6 +118,17 @@ find_package(Threads REQUIRED)
 target_link_libraries(athena PUBLIC Threads::Threads)
 
 target_link_libraries(athena PUBLIC Kokkos::kokkos)
+
+# The <subgrid> closure models run in Python (src/subgrid/subgrid_predict.py) through an
+# embedded interpreter. Point FindPython at the environment with the models' packages
+# (numpy, jax), e.g. -DPython3_EXECUTABLE=/path/to/venv/bin/python: that interpreter is
+# the default <subgrid>/python_executable, so a venv's site-packages are used.
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Embed)
+message(STATUS "Subgrid models: Python ${Python3_VERSION} (${Python3_EXECUTABLE})")
+target_link_libraries(athena PUBLIC Python3::Python)
+target_compile_definitions(athena PRIVATE
+  SUBGRID_PYTHON_SCRIPT="${CMAKE_SOURCE_DIR}/src/subgrid/subgrid_predict.py"
+  SUBGRID_PYTHON_EXECUTABLE="${Python3_EXECUTABLE}")
 if (ENABLE_MPI)
   target_link_libraries(athena PUBLIC MPI::MPI_CXX)
 endif()

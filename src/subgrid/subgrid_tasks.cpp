@@ -23,8 +23,8 @@ namespace subgrid {
 //! \brief Adds subgrid tasks to the "stagen" list already assembled by Hydro (which,
 //! with <subgrid>, leaves out its ConToPrim and NewTimeStep tasks):
 //!   srctrms -> [SubgridSrcTerms] -> sendu_oa
-//!   bcs -> [PredictKsg -> PredictR -> PredictQ -> PredictC -> SubgridDivergence
-//!           -> SubgridConToPrim -> SubgridNewTimeStep]
+//!   bcs -> [PredictClosures -> SubgridDivergence -> SubgridConToPrim
+//!           -> SubgridNewTimeStep]
 //! Called by MeshBlockPack::AddPhysics() after Hydro::AssembleHydroTasks().
 
 void Subgrid::AssembleSubgridTasks(std::map<std::string, std::shared_ptr<TaskList>> tl) {
@@ -37,11 +37,8 @@ void Subgrid::AssembleSubgridTasks(std::map<std::string, std::shared_ptr<TaskLis
     std::exit(EXIT_FAILURE);
   }
 
-  id.ksg   = tl["stagen"]->AddTask(&Subgrid::PredictKsg, this, hid.bcs);
-  id.rsg   = tl["stagen"]->AddTask(&Subgrid::PredictR, this, id.ksg);
-  id.qsg   = tl["stagen"]->AddTask(&Subgrid::PredictQ, this, id.rsg);
-  id.csg   = tl["stagen"]->AddTask(&Subgrid::PredictC, this, id.qsg);
-  id.div   = tl["stagen"]->AddTask(&Subgrid::SubgridDivergence, this, id.csg);
+  id.predict = tl["stagen"]->AddTask(&Subgrid::PredictClosures, this, hid.bcs);
+  id.div   = tl["stagen"]->AddTask(&Subgrid::SubgridDivergence, this, id.predict);
   id.c2p   = tl["stagen"]->AddTask(&Subgrid::SubgridConToPrim, this, id.div);
   id.newdt = tl["stagen"]->AddTask(&Subgrid::SubgridNewTimeStep, this, id.c2p);
   return;
@@ -49,15 +46,13 @@ void Subgrid::AssembleSubgridTasks(std::map<std::string, std::shared_ptr<TaskLis
 
 //----------------------------------------------------------------------------------------
 //! \fn void Subgrid::EvaluateClosures
-//! \brief Runs the Predict chain and SubgridConToPrim outside the task list. Called in
+//! \brief Runs PredictClosures, SubgridDivergence and SubgridConToPrim outside the task
+//! list. Called in
 //! Driver::Initialize after InitBoundaryValuesAndPrimitives.
 
 void Subgrid::EvaluateClosures(Driver *pdrive, int stage) {
   // following functions return a TaskStatus, but it is ignored so cast to (void)
-  (void) PredictKsg(pdrive, stage);
-  (void) PredictR(pdrive, stage);
-  (void) PredictQ(pdrive, stage);
-  (void) PredictC(pdrive, stage);
+  (void) PredictClosures(pdrive, stage);
   (void) SubgridDivergence(pdrive, stage);
   (void) SubgridConToPrim(pdrive, stage);
   return;
