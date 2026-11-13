@@ -36,11 +36,16 @@ limitations are in [`patches/README.md`](patches/README.md).
 
 ### Changes relative to upstream AthenaK
 
-**1. scaluq patches: used unmodified.** Two files from scaluq's `research/f2-metal`
-branch are stored byte for byte in `patches/`:
+**1. scaluq patches: used unmodified, through a git submodule.**
+[`external/scaluq`](https://github.com/forest1040/scaluq/tree/1cec7d83894a375f2f34ad4e8d59845365aef03a/ref/f2_metal/patches)
+points at forest1040/scaluq, branch `research/f2-metal`, pinned to commit `1cec7d8`
+(the head of qulacs/scaluq#463). The patches are taken from
+`ref/f2_metal/patches/` there. They are not copies:
 - `kokkos-5.2.0-acpp-metal.patch` (Kokkos, about 350 lines in 24 files)
 - `adaptivecpp-metal-num-subgroups.patch` (adds a missing Metal builtin to
   AdaptiveCpp; it is applied when building the compiler, not in this repo)
+
+Fetch it with `git submodule update --init kokkos external/scaluq`.
 
 **2. Kokkos**
 - The submodule moves from **4.7.02 to 5.2.0**, the version scaluq's patch targets.

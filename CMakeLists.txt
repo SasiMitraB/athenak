@@ -37,25 +37,29 @@ set(PROBLEM built_in_pgens CACHE STRING "Name of problem generator function")
 
 #------ local patches to the Kokkos 5.2.0 submodule (see patches/README.md) -----------
 
-# apply a patch to kokkos/ once (skip if it is already applied)
+# apply a patch (path relative to the source dir) to kokkos/ once; skip if already applied
 function(athena_apply_kokkos_patch patch)
-  set(_p ${CMAKE_CURRENT_SOURCE_DIR}/patches/${patch})
+  set(_p ${CMAKE_CURRENT_SOURCE_DIR}/${patch})
+  if (NOT EXISTS ${_p})
+    message(FATAL_ERROR "Patch ${patch} not found. If it lives in a submodule, run\n"
+                        "  git submodule update --init external/scaluq")
+  endif()
   execute_process(COMMAND git apply --reverse --check ${_p}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kokkos
     RESULT_VARIABLE _applied OUTPUT_QUIET ERROR_QUIET)
   if (NOT _applied EQUAL 0)
-    message(STATUS "Applying patches/${patch} to kokkos/")
+    message(STATUS "Applying ${patch} to kokkos/")
     execute_process(COMMAND git apply ${_p}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/kokkos
       RESULT_VARIABLE _rc)
     if (NOT _rc EQUAL 0)
-      message(FATAL_ERROR "Could not apply patches/${patch}; is kokkos/ at tag 5.2.0?")
+      message(FATAL_ERROR "Could not apply ${patch}; is kokkos/ at tag 5.2.0?")
     endif()
   endif()
 endfunction()
 
 # Kokkos 5.2 made DualView::d_view/h_view private; keep them public for AthenaK
-athena_apply_kokkos_patch(kokkos-5.2.0-dualview-public.patch)
+athena_apply_kokkos_patch(patches/kokkos-5.2.0-dualview-public.patch)
 # keep View::HostMirror (removal deferred to Kokkos 5.3)
 set(Kokkos_ENABLE_DEPRECATED_CODE_4 ON CACHE BOOL "Keep Kokkos code deprecated in 4.x")
 
@@ -68,7 +72,9 @@ if (Athena_ENABLE_ACPP_METAL)
   set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "Compile Kokkos with Serial")
   set(Kokkos_ENABLE_ONEDPL OFF CACHE BOOL "oneDPL is DPC++ only")
   set(Kokkos_IMPL_SYCL_ACPP ON CACHE BOOL "Kokkos SYCL backend built by AdaptiveCpp")
-  athena_apply_kokkos_patch(kokkos-5.2.0-acpp-metal.patch)
+  # used unmodified from the scaluq team (submodule external/scaluq, pinned commit)
+  athena_apply_kokkos_patch(
+    external/scaluq/ref/f2_metal/patches/kokkos-5.2.0-acpp-metal.patch)
 endif()
 
 #------ set macros exported to config.hpp ------------------------------------------------

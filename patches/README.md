@@ -1,16 +1,40 @@
 # Apple GPU (Metal) patches
 
-These patches are taken unchanged from the scaluq team's F2 investigation
-(forest1040/scaluq, branch `research/f2-metal`, `ref/f2_metal/patches/`;
-qulacs/scaluq#463), discussed upstream in kokkos/kokkos#9750.
+## scaluq patches (git submodule `external/scaluq`, used unmodified)
+
+The two Metal patches come from the scaluq team's F2 investigation
+(qulacs/scaluq#463, discussed upstream in kokkos/kokkos#9750). They are not
+copied here. They are referenced through a git submodule pinned to the exact
+commit we used:
+
+- repository: https://github.com/forest1040/scaluq (branch `research/f2-metal`)
+- commit: `1cec7d83894a375f2f34ad4e8d59845365aef03a` (2026-11-08, head of PR #463)
+- path: `external/scaluq/ref/f2_metal/patches/`
 
 | File | Applies to | Purpose |
 |---|---|---|
 | `kokkos-5.2.0-acpp-metal.patch` | Kokkos 5.2.0 (`d9397f95`, the `kokkos/` submodule) | Lets the Kokkos SYCL backend build with AdaptiveCpp generic SSCP and run correctly on Metal |
 | `adaptivecpp-metal-num-subgroups.patch` | AdaptiveCpp `develop` @ `6c923f68` | Adds the missing Metal builtin `__acpp_sscp_get_num_subgroups` |
 
-`CMakeLists.txt` applies the Kokkos patch to `kokkos/` automatically when
-`-DAthena_ENABLE_ACPP_METAL=ON` is set.
+Fetch the submodule before a Metal build. It is a shallow clone, about 20 MB.
+
+```sh
+git submodule update --init kokkos external/scaluq
+```
+
+`CMakeLists.txt` applies the Kokkos patch from the submodule to `kokkos/` when
+`-DAthena_ENABLE_ACPP_METAL=ON` is set. CPU builds do not need the submodule.
+
+To confirm a file is the scaluq original, compare git blob hashes. A blob hash
+depends only on the file's content.
+
+```sh
+git -C external/scaluq rev-parse HEAD:ref/f2_metal/patches/kokkos-5.2.0-acpp-metal.patch
+# 49a89a4f154df9f484bf587e0d266824781c11cf
+```
+
+If the branch is ever deleted, the same commit stays reachable through the
+pull request: `git fetch https://github.com/qulacs/scaluq.git pull/463/head`.
 
 ## Kokkos 5 compatibility (all builds)
 
@@ -31,7 +55,8 @@ brew install llvm@21 lld@21
 export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk
 L=/opt/homebrew/opt/llvm@21
 
-# AdaptiveCpp develop @ 6c923f68 with adaptivecpp-metal-num-subgroups.patch applied;
+# AdaptiveCpp develop @ 6c923f68 with
+# external/scaluq/ref/f2_metal/patches/adaptivecpp-metal-num-subgroups.patch applied;
 # metal-cpp from https://developer.apple.com/metal/cpp/files/metal-cpp_26.zip
 cmake -S AdaptiveCpp -B build -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=$L/bin/clang -DCMAKE_CXX_COMPILER=$L/bin/clang++ \
