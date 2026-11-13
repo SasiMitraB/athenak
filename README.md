@@ -65,9 +65,17 @@ Fetch it with `git submodule update --init kokkos external/scaluq`.
 **3. AthenaK**
 - **Build:** a new `Athena_ENABLE_ACPP_METAL` option turns on the SYCL backend, forces
   single precision and applies the scaluq patch. `athena.hpp` now includes `<cfloat>`.
-- **Single-precision compile fixes:** cherry-picked from the `single_precision` branch of
-  davidvelasco07/athenak (about 510 of roughly 540 errors). The remaining 27 errors are
-  float/double mismatches, fixed here.
+- **Single-precision compile fixes:** about 510 of the roughly 540 errors are fixed by
+  [`08f5c5d`](https://github.com/davidvelasco07/athenak/commit/08f5c5d91d02c04343074dde3ccd1297c93e4684)
+  ("Fixed compile errors for single precision on CPUs", James Stone, 2024-12-06). It
+  lives on the `single_precision` branch of davidvelasco07/athenak and was never merged
+  into upstream `main`. It is cherry-picked here with `git cherry-pick -x`, so the
+  original author and commit hash are kept in the history (`aa9f5024`). Three merge
+  conflicts were resolved and one hunk, in `pgen/tests/linear_wave.cpp`, was dropped
+  because upstream has since rewritten that code. The remaining 27 errors are
+  float/double mismatches in code added after that commit, fixed here. Two later
+  commits on that branch (Hengrui Zhu, `M_PI` as `Real`) were not applied, because they
+  conflict heavily with current upstream.
 - **Single-precision bug in WENO-Z:** the epsilon `1e-42` overflows in float and gave
   NaN after one step. Single-precision builds now use `1e-14`; fp64 is unchanged.
 - **No fp64 inside GPU kernels:** bare double literals such as `0.5` are written as
