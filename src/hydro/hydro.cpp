@@ -82,7 +82,7 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
   if (pin->DoesParameterExist("hydro","nu_iso") ||
       pin->DoesParameterExist("hydro","nu_aniso")) {
     pvisc = new Viscosity("hydro", ppack, pin);
-    const bool active = (pvisc->nu_iso != 0.0 || pvisc->nu_aniso != 0.0);
+    const bool active = (pvisc->nu_iso != Real(0.0) || pvisc->nu_aniso != Real(0.0));
     has_explicit_viscosity =
         active && pvisc->mode == parabolic::DiffusionSelection::explicit_only;
     has_sts_viscosity =
@@ -103,7 +103,8 @@ Hydro::Hydro(MeshBlockPack *ppack, ParameterInput *pin) :
     if (peos->eos_data.is_ideal) {
       pcond = new Conduction("hydro", ppack, pin);
       const bool active =
-          (pcond->alpha_iso != 0.0 || pcond->alpha_aniso != 0.0 || pcond->alpha_spitzer);
+          (pcond->alpha_iso != Real(0.0) || pcond->alpha_aniso != Real(0.0) ||
+           pcond->alpha_spitzer);
       has_explicit_conduction =
           active && pcond->mode == parabolic::DiffusionSelection::explicit_only;
       has_sts_conduction =

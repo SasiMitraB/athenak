@@ -135,7 +135,7 @@ void Resistivity::AddEMFConstantResist(const DvceFaceFld4D<Real> &b0,
     auto &mbsize = pmy_pack->pmb->mb_size;
     auto eta_o = eta_ohm;
 
-    int scr_level = 0;
+    constexpr int scr_level = 0;
     size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1) * 3;
 
     par_for_outer("ohm1", DevExeSpace(), scr_size, scr_level, 0, nmb1,
@@ -166,7 +166,7 @@ void Resistivity::AddEMFConstantResist(const DvceFaceFld4D<Real> &b0,
     auto &mbsize = pmy_pack->pmb->mb_size;
     auto eta_o = eta_ohm;
 
-    int scr_level = 0;
+    constexpr int scr_level = 0;
     size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1) * 3;
 
     par_for_outer("ohm2", DevExeSpace(), scr_size, scr_level, 0, nmb1, js, je+1,
@@ -198,7 +198,7 @@ void Resistivity::AddEMFConstantResist(const DvceFaceFld4D<Real> &b0,
   auto &mbsize = pmy_pack->pmb->mb_size;
   auto eta_o = eta_ohm;
 
-  int scr_level = 0;
+  constexpr int scr_level = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1) * 3;
 
   par_for_outer("ohm3", DevExeSpace(), scr_size, scr_level, 0, nmb1, ks, ke+1, js, je+1,

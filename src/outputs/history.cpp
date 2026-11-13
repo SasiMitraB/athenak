@@ -142,9 +142,9 @@ void HistoryOutput::LoadHydroHistoryData(HistoryData *pdata, Mesh *pm) {
     }
 
     // Hydro KE
-    hvars.the_array[nhydro_  ] = vol*0.5*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
-    hvars.the_array[nhydro_+1] = vol*0.5*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
-    hvars.the_array[nhydro_+2] = vol*0.5*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nhydro_  ] = vol*Real(0.5)*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nhydro_+1] = vol*Real(0.5)*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nhydro_+2] = vol*Real(0.5)*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
 
     // Scalar masses
     for (int s=0; s<nscalars_; ++s) {
@@ -343,14 +343,14 @@ void HistoryOutput::LoadMHDHistoryData(HistoryData *pdata, Mesh *pm) {
     }
 
     // MHD KE
-    hvars.the_array[nmhd_  ] = vol*0.5*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
-    hvars.the_array[nmhd_+1] = vol*0.5*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
-    hvars.the_array[nmhd_+2] = vol*0.5*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nmhd_  ] = vol*Real(0.5)*SQR(u0_(m,IM1,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nmhd_+1] = vol*Real(0.5)*SQR(u0_(m,IM2,k,j,i))/u0_(m,IDN,k,j,i);
+    hvars.the_array[nmhd_+2] = vol*Real(0.5)*SQR(u0_(m,IM3,k,j,i))/u0_(m,IDN,k,j,i);
 
     // MHD ME
-    hvars.the_array[nmhd_+3] = vol*0.25*(SQR(bx1f(m,k,j,i+1)) + SQR(bx1f(m,k,j,i)));
-    hvars.the_array[nmhd_+4] = vol*0.25*(SQR(bx2f(m,k,j+1,i)) + SQR(bx2f(m,k,j,i)));
-    hvars.the_array[nmhd_+5] = vol*0.25*(SQR(bx3f(m,k+1,j,i)) + SQR(bx3f(m,k,j,i)));
+    hvars.the_array[nmhd_+3] = vol*Real(0.25)*(SQR(bx1f(m,k,j,i+1)) + SQR(bx1f(m,k,j,i)));
+    hvars.the_array[nmhd_+4] = vol*Real(0.25)*(SQR(bx2f(m,k,j+1,i)) + SQR(bx2f(m,k,j,i)));
+    hvars.the_array[nmhd_+5] = vol*Real(0.25)*(SQR(bx3f(m,k+1,j,i)) + SQR(bx3f(m,k,j,i)));
 
     // Scalar masses
     for (int s=0; s<nscalars_; ++s) {
@@ -447,7 +447,7 @@ void HistoryOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin) {
   } // End loop over hist_data vector
 
   // increment counters, clean up
-  if (out_params.last_time < 0.0) {
+  if (out_params.last_time < Real(0.0)) {
     out_params.last_time = pm->time;
   } else {
     out_params.last_time += out_params.dt;

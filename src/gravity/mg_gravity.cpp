@@ -249,7 +249,8 @@ void MGGravity::SmoothPack(int color) {
   int is = ngh_, ie = is+(indcs_.nx1>>ll)-1;
   int js = ngh_, je = js+(indcs_.nx2>>ll)-1;
   int ks = ngh_, ke = ks+(indcs_.nx3>>ll)-1;
-  GravityStencil stencil{static_cast<MGGravityDriver*>(pmy_driver_)->omega_/6.0};
+  GravityStencil stencil{static_cast<MGGravityDriver*>(pmy_driver_)->omega_
+                         / static_cast<Real>(6.0)};
   if (on_host_) {
     Smooth(u_[current_level_].h_view, src_[current_level_].h_view,
            coeff_[current_level_].h_view, matrix_[current_level_].h_view,

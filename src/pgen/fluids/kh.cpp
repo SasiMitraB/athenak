@@ -63,11 +63,11 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   Real gm1, p0;
   int nfluid, nscalars;
   if (pmbp->phydro != nullptr) {
-    gm1 = (pmbp->phydro->peos->eos_data.gamma) - 1.0;
+    gm1 = (pmbp->phydro->peos->eos_data.gamma) - Real(1.0);
     nfluid = pmbp->phydro->nhydro;
     nscalars = pmbp->phydro->nscalars;
   } else if (pmbp->pmhd != nullptr) {
-    gm1 = (pmbp->pmhd->peos->eos_data.gamma) - 1.0;
+    gm1 = (pmbp->pmhd->peos->eos_data.gamma) - Real(1.0);
     nfluid = pmbp->pmhd->nmhd;
     nscalars = pmbp->pmhd->nscalars;
   }
@@ -106,7 +106,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
     auto rand_gen = rand_pool64.get_state();  // get random number state this thread
     Real rval;
 
-    w0_(m,IEN,k,j,i) = 20.0/gm1;
+    w0_(m,IEN,k,j,i) = Real(20.0)/gm1;
     w0_(m,IVZ,k,j,i) = 0.0;
 
     // Lorentz factor (needed to initialize 4-velocity in SR)
@@ -118,61 +118,64 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
       pres = 20.0;
       dens = 1.0;
       vx = -vshear*tanh(x2v/sigma);
-      vy = -amp*vshear*sin(2.*M_PI*x1v)*exp( -SQR(x2v/sigma) );
+      vy = -amp*vshear*sin(Real(2.)*Real(M_PI)*x1v)*exp( -SQR(x2v/sigma) );
       vz = 0.0;
       scal = 0.0;
-      if (x2v > 0.0) scal = 1.0;
+      if (x2v > Real(0.0)) scal = Real(1.0);
     } else if (iprob == 2) {
       // pres = 1.0;
       pres = p_in;
       vz = 0.0;
-      if(x2v <= 0.0) {
-        dens = rho0 - rho1*tanh((x2v+0.5)/a_char);
-        vx = -vshear*tanh((x2v+0.5)/a_char);
-        vy = -amp*vshear*sin(2.*M_PI*x1v)*exp( -SQR((x2v+0.5)/sigma) );
+      if(x2v <= Real(0.0)) {
+        dens = rho0 - rho1*tanh((x2v+Real(0.5))/a_char);
+        vx = -vshear*tanh((x2v+Real(0.5))/a_char);
+        vy = -amp*vshear*sin(Real(2.)*Real(M_PI)*x1v)*exp( -SQR((x2v+Real(0.5))/sigma) );
         if (is_relativistic) {
-          u00 = 1.0/sqrt(1.0 - vx*vx - vy*vy);
+          u00 = Real(1.0)/sqrt(Real(1.0) - vx*vx - vy*vy);
         }
         // scal = 0.0;
         // if (x2v < -0.5) scal = 1.0;
-        scal = y0 - y1*tanh((x2v+0.5)/a_char);
+        scal = y0 - y1*tanh((x2v+Real(0.5))/a_char);
       } else {
-        dens = rho0 + rho1*tanh((x2v-0.5)/a_char);
-        vx = vshear*tanh((x2v-0.5)/a_char);
-        vy = amp*vshear*sin(2.*M_PI*x1v)*exp( -SQR((x2v-0.5)/sigma) );
+        dens = rho0 + rho1*tanh((x2v-Real(0.5))/a_char);
+        vx = vshear*tanh((x2v-Real(0.5))/a_char);
+        vy = amp*vshear*sin(Real(2.)*Real(M_PI)*x1v)*exp( -SQR((x2v-Real(0.5))/sigma) );
         if (is_relativistic) {
-          u00 = 1.0/sqrt(1.0 - vx*vx - vy*vy);
+          u00 = Real(1.0)/sqrt(Real(1.0) - vx*vx - vy*vy);
         }
         // scal = 0.0;
         // if (x2v > 0.5) scal = 1.0;
-        scal = y0 + y1*tanh((x2v-0.5)/a_char);
+        scal = y0 + y1*tanh((x2v-Real(0.5))/a_char);
       }
     } else if (iprob == 3) {
       // sinusoidal velocity with random perts (geometry of turbulence test)
-      rval = amp*2.0*(rand_gen.frand() - 0.5);
+      rval = amp*Real(2.0)*(rand_gen.frand() - Real(0.5));
       dens = 1.0;
       pres = 1.0;
       vx = rval;
-      vy = vshear*sin(2.*M_PI*x1v);
+      vy = vshear*sin(Real(2.)*Real(M_PI)*x1v);
     // Lecoanet test ICs
     } else if (iprob == 4) {
       pres = 10.0;
       Real a = 0.05;
-      dens = 1.0 + 0.5*drho_rho0*(tanh((x2v + 0.5)/a) - tanh((x2v - 0.5)/a));
-      vx = vshear*(tanh((x2v + 0.5)/a) - tanh((x2v - 0.5)/a) - 1.0);
-      Real ave_sine = sin(2.*M_PI*x1v);
-      if (x1v > 0.0) {
-        ave_sine -= sin(2.*M_PI*(-0.5 + x1v));
+      dens = Real(1.0) + Real(0.5)*drho_rho0*(tanh((x2v + Real(0.5))/a)
+                                            - tanh((x2v - Real(0.5))/a));
+      vx = vshear*(tanh((x2v + Real(0.5))/a) - tanh((x2v - Real(0.5))/a) - Real(1.0));
+      Real ave_sine = sin(Real(2.)*Real(M_PI)*x1v);
+      if (x1v > Real(0.0)) {
+        ave_sine -= sin(Real(2.)*Real(M_PI)*(-Real(0.5) + x1v));
       } else {
-        ave_sine -= sin(2.*M_PI*(0.5 + x1v));
+        ave_sine -= sin(Real(2.)*Real(M_PI)*(Real(0.5) + x1v));
       }
       ave_sine /= 2.0;
 
       // translated x1= x - 1/2 relative to Lecoanet (2015) shifts sine function by pi
       // (half-period) and introduces U_z sign change:
       vy = -amp*ave_sine*
-            (exp(-(SQR(x2v + 0.5))/(sigma*sigma)) + exp(-(SQR(x2v - 0.5))/(sigma*sigma)));
-      scal = 0.5*(tanh((x2v + 0.5)/a) - tanh((x2v - 0.5)/a) + 2.0);
+            (exp(-(SQR(x2v + Real(0.5)))/(sigma*sigma))
+             + exp(-(SQR(x2v - Real(0.5)))/(sigma*sigma)));
+      scal = Real(0.5)*(tanh((x2v + Real(0.5))/a) - tanh((x2v - Real(0.5))/a)
+                        + Real(2.0));
       vz = 0.0;
     }
 

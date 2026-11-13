@@ -50,7 +50,7 @@ void ReconCellT(const EOS_Data &eos, const bool apply_floors,
   constexpr int dk = (ivx == IVZ) ? 1 : 0;
 
   const Real dfloor = eos.dfloor;
-  const Real efloor = eos.is_ideal ? (eos.pfloor/(eos.gamma - 1.0)) : 0.0;
+  const Real efloor = eos.is_ideal ? (eos.pfloor/(eos.gamma - Real(1.0))) : Real(0.0);
 
   Real ql_val, qr_val;
   if constexpr (recon == ReconstructionMethod::dc) {

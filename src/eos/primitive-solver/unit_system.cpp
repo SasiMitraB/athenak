@@ -58,10 +58,12 @@ Primitive::UnitSystem Primitive::MakeGeometricSolar() {
 
     static_cast<Real>((CGS.c*CGS.c)/(CGS.G * CGS.Msun)), // length, Msun
     static_cast<Real>(PS_CUBE( CGS.c)/(CGS.G * CGS.Msun)), // time, Msun
-    static_cast<Real>(PS_CUBE( (CGS.G * CGS.Msun)/(CGS.c*CGS.c) )), // number density, Msun^-3
+    // number density, Msun^-3
+    static_cast<Real>(PS_CUBE( (CGS.G * CGS.Msun)/(CGS.c*CGS.c) )),
     static_cast<Real>(1.0 / CGS.Msun), // mass, Msun
     static_cast<Real>(1.0 / (CGS.Msun * CGS.c*CGS.c)), // energy, Msun
-    static_cast<Real>(PS_CUBE( CGS.G/(CGS.c*CGS.c) ) * PS_SQR( CGS.Msun/(CGS.c) )), // pressure, Msun^-2
+    // pressure, Msun^-2
+    static_cast<Real>(PS_CUBE( CGS.G/(CGS.c*CGS.c) ) * PS_SQR( CGS.Msun/(CGS.c) )),
 //     CGS.kb / (CGS.Msun * CGS.c*CGS.c), // temperature, Msun
     static_cast<Real>(CGS.kb/CGS.MeV), // temperature, MeV
     static_cast<Real>(CGS.kb/CGS.MeV), // chemical potential, MeV

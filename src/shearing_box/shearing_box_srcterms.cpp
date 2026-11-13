@@ -167,7 +167,7 @@ void ShearingBoxFC::SourceTermsFC(const DvceFaceFld4D<Real> &b0,
 
   int nmb1 = pmy_pack->nmb_thispack - 1;
   size_t scr_size = 0;
-  int scr_level = 0;
+  constexpr int scr_level = 0;
 
   //---- 2-D problem:
   // electric field E = - (v_{K} x B), where v_{K} is in the z-direction.  Thus

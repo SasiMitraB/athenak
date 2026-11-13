@@ -23,7 +23,8 @@
 KOKKOS_INLINE_FUNCTION
 static Real LeftEdgeX(int ith, int n, Real xmin, Real xmax) {
   Real x = (static_cast<Real>(ith)) / (static_cast<Real>(n));
-  return (x*xmax - x*xmin) - (0.5*xmax - 0.5*xmin) + (0.5*xmin + 0.5*xmax);
+  return (x*xmax - x*xmin) - (Real(0.5)*xmax - Real(0.5)*xmin)
+         + (Real(0.5)*xmin + Real(0.5)*xmax);
 }
 
 //----------------------------------------------------------------------------------------
@@ -34,8 +35,9 @@ static Real LeftEdgeX(int ith, int n, Real xmin, Real xmax) {
 
 KOKKOS_INLINE_FUNCTION
 static Real CellCenterX(int ith, int n, Real xmin, Real xmax) {
-  Real x = (static_cast<Real>(ith) + 0.5) / (static_cast<Real>(n));
-  return (x*xmax - x*xmin) - (0.5*xmax - 0.5*xmin) + (0.5*xmin + 0.5*xmax);
+  Real x = (static_cast<Real>(ith) + Real(0.5)) / (static_cast<Real>(n));
+  return (x*xmax - x*xmin) - (Real(0.5)*xmax - Real(0.5)*xmin)
+         + (Real(0.5)*xmin + Real(0.5)*xmax);
 }
 
 //----------------------------------------------------------------------------------------

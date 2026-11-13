@@ -63,7 +63,7 @@ TaskStatus ShearingBoxFC::PackAndSendFC(DvceFaceFld4D<Real> &b,
   const Real &yshear_ = yshear;
   const auto &x1bndry_mbgid_ = x1bndry_mbgid;
   auto &sbuf = sendbuf;
-  int scr_lvl=0;
+  constexpr int scr_lvl = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(nj) * 2;
   for (int n=0; n<2; ++n) {
     int nmb1 = nmb_x1bndry(n) - 1;
@@ -385,7 +385,7 @@ TaskStatus ShearingBoxFC::RecvAndUnpackFC(DvceFaceFld4D<Real> &b) {
   const int &gids_ = pmy_pack->gids;
   const auto &x1bndry_mbgid_ = x1bndry_mbgid;
   auto &rbuf = recvbuf;
-  int scr_lvl=0;
+  constexpr int scr_lvl = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(nj) * 3;
   for (int n=0; n<2; ++n) {
     int nmb1 = nmb_x1bndry(n) - 1;

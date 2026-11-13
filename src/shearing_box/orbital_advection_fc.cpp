@@ -233,7 +233,7 @@ TaskStatus OrbitalAdvectionFC::RecvAndUnpackFC(DvceFaceFld4D<Real> &b0,
   Real &dt = pmy_pack->pmesh->dt;
   Real qo = qshear*omega0;
 
-  int scr_lvl=0;
+  constexpr int scr_lvl = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(nfx) * 2;
   auto &emfx_ = emfx;
   auto &emfz_ = emfz;

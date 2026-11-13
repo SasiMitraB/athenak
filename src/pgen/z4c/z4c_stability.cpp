@@ -74,7 +74,7 @@ void ProblemGenerator::UserProblem(ParameterInput *pin, const bool restart) {
   // random number
   Kokkos::Random_XorShift64_Pool<> rand_pool64(pmbp->gids);
   size_t scr_size = ScrArray1D<Real>::shmem_size(12);
-  int scr_level = 0;
+  constexpr int scr_level = 0;
   par_for_outer("pgen_stability",DevExeSpace(), scr_size, scr_level, 0,nmb-1,ksg,keg,
   KOKKOS_LAMBDA(TeamMember_t member, const int m, const int k) {
     // get random number state this thread

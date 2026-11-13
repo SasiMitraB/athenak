@@ -32,17 +32,24 @@ void WENOZ(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q_
   const Real beta_coeff[2]{13. / 12., 0.25};
 
   Real beta[3];
-  beta[0] = beta_coeff[0] * SQR(q_im2 +     q_i - 2.0*q_im1) +
-            beta_coeff[1] * SQR(q_im2 + 3.0*q_i - 4.0*q_im1);
+  beta[0] = beta_coeff[0] * SQR(q_im2 +     q_i - Real(2.0)*q_im1) +
+            beta_coeff[1] * SQR(q_im2 + Real(3.0)*q_i - Real(4.0)*q_im1);
 
-  beta[1] = beta_coeff[0] * SQR(q_im1 + q_ip1 - 2.0*q_i) +
+  beta[1] = beta_coeff[0] * SQR(q_im1 + q_ip1 - Real(2.0)*q_i) +
             beta_coeff[1] * SQR(q_im1 - q_ip1);
 
-  beta[2] = beta_coeff[0] * SQR(q_ip2 +      q_i - 2.0*q_ip1) +
-            beta_coeff[1] * SQR(q_ip2 + 3.0* q_i - 4.0*q_ip1);
+  beta[2] = beta_coeff[0] * SQR(q_ip2 +      q_i - Real(2.0)*q_ip1) +
+            beta_coeff[1] * SQR(q_ip2 + Real(3.0)* q_i - Real(4.0)*q_ip1);
 
   // Rescale epsilon
+#if SINGLE_PRECISION_ENABLED
+  // 1e-42 is a denormal in float (flushed to zero on GPUs), and SQR(tau_5/1e-42)
+  // overflows FLT_MAX, giving inf/inf = NaN in the weights. Smoothness indicators
+  // below ~1e-14 are round-off in fp32 anyway.
+  const Real epsL = Real(1.0e-14);
+#else
   const Real epsL = 1.0e-42;
+#endif
 
   // WENO-Z: Borges et al. 2008, Castro et al. 2011
   const Real tau_5 = fabs(beta[0] - beta[2]);
@@ -55,27 +62,27 @@ void WENOZ(const Real &q_im2, const Real &q_im1, const Real &q_i, const Real &q_
   // compute qL_ip1
   // Factor of 1/6 in coefficients of f[] array applied to alpha_sum to reduce divisions
   Real f[3];
-  f[0] = ( 2.0*q_im2 - 7.0*q_im1 + 11.0*q_i  );
-  f[1] = (-1.0*q_im1 + 5.0*q_i   + 2.0 *q_ip1);
-  f[2] = ( 2.0*q_i   + 5.0*q_ip1 -      q_ip2);
+  f[0] = ( Real(2.0)*q_im2 - Real(7.0)*q_im1 + Real(11.0)*q_i  );
+  f[1] = (-Real(1.0)*q_im1 + Real(5.0)*q_i   + Real(2.0) *q_ip1);
+  f[2] = ( Real(2.0)*q_i   + Real(5.0)*q_ip1 -      q_ip2);
 
   Real alpha[3];
-  alpha[0] = 0.1*(1.0 + indicator[0]);
-  alpha[1] = 0.6*(1.0 + indicator[1]);
-  alpha[2] = 0.3*(1.0 + indicator[2]);
-  Real alpha_sum = 6.0*(alpha[0] + alpha[1] + alpha[2]);
+  alpha[0] = Real(0.1)*(Real(1.0) + indicator[0]);
+  alpha[1] = Real(0.6)*(Real(1.0) + indicator[1]);
+  alpha[2] = Real(0.3)*(Real(1.0) + indicator[2]);
+  Real alpha_sum = Real(6.0)*(alpha[0] + alpha[1] + alpha[2]);
 
   ql_ip1 = (f[0]*alpha[0] + f[1]*alpha[1] + f[2]*alpha[2])/alpha_sum;
 
   // compute qR_i
   // Factor of 1/6 in coefficients of f[] array applied to alpha_sum to reduce divisions
-  f[0] = ( 2.0*q_ip2 - 7.0*q_ip1 + 11.0*q_i  );
-  f[1] = (-1.0*q_ip1 + 5.0*q_i   + 2.0 *q_im1);
-  f[2] = ( 2.0*q_i   + 5.0*q_im1 -      q_im2);
+  f[0] = ( Real(2.0)*q_ip2 - Real(7.0)*q_ip1 + Real(11.0)*q_i  );
+  f[1] = (-Real(1.0)*q_ip1 + Real(5.0)*q_i   + Real(2.0) *q_im1);
+  f[2] = ( Real(2.0)*q_i   + Real(5.0)*q_im1 -      q_im2);
 
-  alpha[0] = 0.1*(1.0 + indicator[2]);
-  alpha[2] = 0.3*(1.0 + indicator[0]);
-  alpha_sum = 6.0*(alpha[0] + alpha[1] + alpha[2]);
+  alpha[0] = Real(0.1)*(Real(1.0) + indicator[2]);
+  alpha[2] = Real(0.3)*(Real(1.0) + indicator[0]);
+  alpha_sum = Real(6.0)*(alpha[0] + alpha[1] + alpha[2]);
 
   qr_i = (f[0]*alpha[0] + f[1]*alpha[1] + f[2]*alpha[2])/alpha_sum;
 

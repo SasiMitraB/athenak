@@ -137,7 +137,7 @@ void Hydro::CalculateFluxes(Driver *pdriver, int stage) {
         0, nmb1, ks, ke, js, je, is, ie+1,
         KOKKOS_LAMBDA(int m, int k, int j, int i) {
           for (int n = nhyd_; n < nvars; ++n) {
-            if (flx1(m, IDN, k, j, i) >= 0.0) {
+            if (flx1(m, IDN, k, j, i) >= Real(0.0)) {
               flx1(m, n, k, j, i) = flx1(m, IDN, k, j, i) * wl_(m, n, k, j, i);
             } else {
               flx1(m, n, k, j, i) = flx1(m, IDN, k, j, i) * wr_(m, n, k, j, i);
@@ -176,7 +176,7 @@ void Hydro::CalculateFluxes(Driver *pdriver, int stage) {
         0, nmb1, ks, ke, js, je+1, is, ie,
         KOKKOS_LAMBDA(int m, int k, int j, int i) {
           for (int n = nhyd_; n < nvars; ++n) {
-            if (flx2(m, IDN, k, j, i) >= 0.0) {
+            if (flx2(m, IDN, k, j, i) >= Real(0.0)) {
               flx2(m, n, k, j, i) = flx2(m, IDN, k, j, i) * wl_(m, n, k, j, i);
             } else {
               flx2(m, n, k, j, i) = flx2(m, IDN, k, j, i) * wr_(m, n, k, j, i);
@@ -215,7 +215,7 @@ void Hydro::CalculateFluxes(Driver *pdriver, int stage) {
         0, nmb1, ks, ke+1, js, je, is, ie,
         KOKKOS_LAMBDA(int m, int k, int j, int i) {
           for (int n = nhyd_; n < nvars; ++n) {
-            if (flx3(m, IDN, k, j, i) >= 0.0) {
+            if (flx3(m, IDN, k, j, i) >= Real(0.0)) {
               flx3(m, n, k, j, i) = flx3(m, IDN, k, j, i) * wl_(m, n, k, j, i);
             } else {
               flx3(m, n, k, j, i) = flx3(m, IDN, k, j, i) * wr_(m, n, k, j, i);

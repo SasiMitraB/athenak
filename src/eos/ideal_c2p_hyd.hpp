@@ -23,10 +23,10 @@ void SingleC2P_IdealHyd(HydCons1D &u, const EOS_Data &eos,
                         HydPrim1D &w,
                         bool &dfloor_used, bool &efloor_used, bool &tfloor_used) {
   const Real &dfloor_ = eos.dfloor;
-  Real efloor = eos.pfloor/(eos.gamma - 1.0);
+  Real efloor = eos.pfloor/(eos.gamma - Real(1.0));
   Real tfloor = eos.tfloor;
   Real sfloor = eos.sfloor;
-  Real gm1 = eos.gamma - 1.0;
+  Real gm1 = eos.gamma - Real(1.0);
 
   // apply density floor, without changing momentum or energy
   if (u.d < dfloor_) {
@@ -36,13 +36,13 @@ void SingleC2P_IdealHyd(HydCons1D &u, const EOS_Data &eos,
   w.d = u.d;
 
   // compute velocities
-  Real di = 1.0/u.d;
+  Real di = Real(1.0)/u.d;
   w.vx = di*u.mx;
   w.vy = di*u.my;
   w.vz = di*u.mz;
 
   // set internal energy, apply floor, correct total energy (if needed)
-  Real e_k = 0.5*di*(SQR(u.mx) + SQR(u.my) + SQR(u.mz));
+  Real e_k = Real(0.5)*di*(SQR(u.mx) + SQR(u.my) + SQR(u.mz));
   w.e = (u.e - e_k);
   if (w.e < efloor) {
     w.e = efloor;
@@ -78,7 +78,7 @@ void SingleP2C_IdealHyd(const HydPrim1D &w, HydCons1D &u) {
   u.mx = w.d*w.vx;
   u.my = w.d*w.vy;
   u.mz = w.d*w.vz;
-  u.e = w.e + 0.5*w.d*(SQR(w.vx) + SQR(w.vy) + SQR(w.vz));
+  u.e = w.e + Real(0.5)*w.d*(SQR(w.vx) + SQR(w.vy) + SQR(w.vz));
   return;
 }
 
@@ -90,13 +90,13 @@ void SingleP2C_IdealHyd(const HydPrim1D &w, HydCons1D &u) {
 
 KOKKOS_INLINE_FUNCTION
 Real EquationC22(Real z, Real &u_d, Real q, Real r, EOS_Data eos) {
-  Real const gm1 = eos.gamma - 1.0;
-  Real const w = sqrt(1.0 + z*z);         // (C15)
+  Real const gm1 = eos.gamma - Real(1.0);
+  Real const w = sqrt(Real(1.0) + z*z);         // (C15)
   Real const wd = u_d/w;                  // (C15)
-  Real eps = w*q - z*r + (z*z)/(1.0 + w); // (C16)
+  Real eps = w*q - z*r + (z*z)/(Real(1.0) + w); // (C16)
   Real epsmin = fmax(eos.pfloor/(wd*gm1), eos.sfloor*pow(wd, gm1)/gm1);
   eps = fmax(eps, epsmin);                // (C18)
-  Real const h = 1.0 + eos.gamma*eps;     // (C1) & (C21)
+  Real const h = Real(1.0) + eos.gamma*eps;     // (C1) & (C21)
   return (z - r/h); // (C22)
 }
 
@@ -113,8 +113,8 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
   const int max_iterations = 25;
   const Real tol = 1.0e-12;
   const Real v_max = 0.9999999999995;  // NOTE(@pdmullen): SQR(v_max) = 1.0 - tol;
-  const Real kmax = 2.0*v_max/(1.0 + v_max*v_max);
-  const Real gm1 = eos.gamma - 1.0;
+  const Real kmax = Real(2.0)*v_max/(Real(1.0) + v_max*v_max);
+  const Real gm1 = eos.gamma - Real(1.0);
 
   // apply density floor, without changing momentum or energy
   if (u.d < eos.dfloor) {
@@ -131,15 +131,15 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
   // Recast all variables (eq C2)
   Real q = u.e/u.d;
   Real r = sqrt(s2)/u.d;
-  Real kk = r/(1.+q);
+  Real kk = r/(Real(1.)+q);
 
   // Enforce lower velocity bound (eq. C13). This bound combined with a floor on
   // the value of p will guarantee "some" result of the inversion
   kk = fmin(kmax, kk);
 
   // Compute bracket (C23)
-  Real zm = 0.5*kk/sqrt(1.0 - 0.25*kk*kk);
-  Real zp = kk/sqrt(1.0 - kk*kk);
+  Real zm = Real(0.5)*kk/sqrt(Real(1.0) - Real(0.25)*kk*kk);
+  Real zp = kk/sqrt(Real(1.0) - kk*kk);
 
   // Evaluate master function (eq C22) at bracket values
   Real fm = EquationC22(zm, u.d, q, r, eos);
@@ -148,10 +148,10 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
   // For simplicity on the GPU, find roots using the false position method
   int iterations = max_iterations;
   // If bracket within tolerances, don't bother doing any iterations
-  if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < 2.0*tol)) {
+  if ((fabs(zm-zp) < tol) || ((fabs(fm) + fabs(fp)) < Real(2.0)*tol)) {
     iterations = -1;
   }
-  Real z = 0.5*(zm + zp);
+  Real z = Real(0.5)*(zm + zp);
 
   for (iter_used=0; iter_used < iterations; ++iter_used) {
     z =  (zm*fp - zp*fm)/(fp-fm);  // linear interpolation to point f(z)=0
@@ -164,13 +164,13 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
     }
 
     // assign zm-->zp if root bracketed by [z,zp]
-    if (f*fp < 0.0) {
+    if (f*fp < Real(0.0)) {
       zm = zp;
       fm = fp;
       zp = z;
       fp = f;
     } else {  // assign zp-->z if root bracketed by [zm,z]
-      fm = 0.5*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
+      fm = Real(0.5)*fm; // 1/2 comes from "Illinois algorithm" to accelerate convergence
       zp = z;
       fp = f;
     }
@@ -191,7 +191,7 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
   }
 
   // iterations ended, compute primitives from resulting value of z
-  Real const lor = sqrt(1.0 + z*z);  // (C15)
+  Real const lor = sqrt(Real(1.0) + z*z);  // (C15)
 
   // compute density then apply floor
   Real dens = u.d/lor;
@@ -201,7 +201,7 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
   }
 
   // compute specific internal energy density then apply floor
-  Real eps = lor*q - z*r + (z*z)/(1.0 + lor);   // (C16)
+  Real eps = lor*q - z*r + (z*z)/(Real(1.0) + lor);   // (C16)
   Real epsmin = fmax(eos.pfloor/(dens*gm1), eos.sfloor*pow(dens, gm1)/gm1);
   if (eps <= epsmin) {
     eps = epsmin;
@@ -209,8 +209,8 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
   }
 
   // set parameters required for velocity inversion
-  Real const h = 1.0 + eos.gamma*eps;  // (C21)
-  Real const conv = 1.0/h;             // (C26)
+  Real const h = Real(1.0) + eos.gamma*eps;  // (C21)
+  Real const conv = Real(1.0)/h;             // (C26)
 
   // set primitive variables
   w.d  = dens;
@@ -230,12 +230,12 @@ void SingleC2P_IdealSRHyd(HydCons1D &u, const EOS_Data &eos, const Real s2, HydP
 KOKKOS_INLINE_FUNCTION
 void SingleP2C_IdealSRHyd(const HydPrim1D &w, const Real gam, HydCons1D &u) {
   // Calculate Lorentz factor
-  Real u0 = sqrt(1.0 + SQR(w.vx) + SQR(w.vy) + SQR(w.vz));
+  Real u0 = sqrt(Real(1.0) + SQR(w.vx) + SQR(w.vy) + SQR(w.vz));
   Real wgas_u0 = (w.d + gam*w.e)*u0;
 
   // Set conserved quantities
   u.d  = w.d * u0;
-  u.e  = wgas_u0 * u0 - (gam-1.0)*w.e - u.d;  // In SR, evolve E - D
+  u.e  = wgas_u0 * u0 - (gam-Real(1.0))*w.e - u.d;  // In SR, evolve E - D
   u.mx = wgas_u0 * w.vx;            // In SR, vx/y/z are 4-velocity
   u.my = wgas_u0 * w.vy;
   u.mz = wgas_u0 * w.vz;
@@ -253,7 +253,7 @@ void TransformToSRHyd(const HydCons1D &u, Real glower[][4], Real gupper[][4],
                       Real &s2, HydCons1D &u_sr) {
   // Need to multiply the conserved density by alpha, so that it
   // contains a lorentz factor
-  Real alpha = sqrt(-1.0/gupper[0][0]);
+  Real alpha = sqrt(-Real(1.0)/gupper[0][0]);
   u_sr.d = u.d*alpha;
 
   // We are evolving T^t_t, but the SR C2P algorithm is only consistent with
@@ -263,7 +263,7 @@ void TransformToSRHyd(const HydCons1D &u, Real glower[][4], Real gupper[][4],
            gupper[0][1]*u.mx + gupper[0][2]*u.my + gupper[0][3]*u.mz;
 
   // This is only true if sqrt{-g}=1!
-  u_sr.e *= (-1./gupper[0][0]);  // Multiply by alpha^2
+  u_sr.e *= (-Real(1.)/gupper[0][0]);  // Multiply by alpha^2
 
   // Subtract density for consistency with the rest of the algorithm
   u_sr.e -= u_sr.d;
@@ -306,11 +306,12 @@ KOKKOS_INLINE_FUNCTION
 void SingleP2C_IdealGRHyd(const Real glower[][4], const Real gupper[][4],
                           const HydPrim1D &w, const Real &gam, HydCons1D &u) {
   // Calculate 4-velocity (exploiting symmetry of metric)
-  Real q = glower[1][1]*w.vx*w.vx +2.0*glower[1][2]*w.vx*w.vy +2.0*glower[1][3]*w.vx*w.vz
-         + glower[2][2]*w.vy*w.vy +2.0*glower[2][3]*w.vy*w.vz
+  Real q = glower[1][1]*w.vx*w.vx +Real(2.0)*glower[1][2]*w.vx*w.vy
+         +Real(2.0)*glower[1][3]*w.vx*w.vz
+         + glower[2][2]*w.vy*w.vy +Real(2.0)*glower[2][3]*w.vy*w.vz
          + glower[3][3]*w.vz*w.vz;
-  Real alpha = sqrt(-1.0/gupper[0][0]);
-  Real gamma = sqrt(1.0 + q);
+  Real alpha = sqrt(-Real(1.0)/gupper[0][0]);
+  Real gamma = sqrt(Real(1.0) + q);
   Real u0 = gamma / alpha;
   Real u1 = w.vx - alpha * gamma * gupper[0][1];
   Real u2 = w.vy - alpha * gamma * gupper[0][2];
@@ -325,7 +326,7 @@ void SingleP2C_IdealGRHyd(const Real glower[][4], const Real gupper[][4],
 
   // set conserved quantities
   u.d  = w.d * u0;
-  u.e  = wgas_u0 * u_0 + (gam-1.0)*w.e + u.d;  // evolve T^t_t + D
+  u.e  = wgas_u0 * u_0 + (gam-Real(1.0))*w.e + u.d;  // evolve T^t_t + D
   u.mx = wgas_u0 * u_1;
   u.my = wgas_u0 * u_2;
   u.mz = wgas_u0 * u_3;

@@ -107,7 +107,7 @@ void Viscosity::AddViscousFluxIso(const DvceArray5D<Real> &w0, const EOS_Data &e
   Real nu_iso_ = nu_iso;
 
   // fluxes in x1-direction
-  int scr_level = 0;
+  constexpr int scr_level = 0;
   size_t scr_size = (ScrArray1D<Real>::shmem_size(ncells1)) * 3;
   auto flx1 = flx.x1f;
 
@@ -277,7 +277,7 @@ void Viscosity::NewTimeStep(const DvceArray5D<Real> &w0, const EOS_Data &eos_dat
       inv_dx2_max = std::max(inv_dx2_max, inv_dx2);
     }
     Real rate = 2.0*nu_iso*(inv_dx2_sum + inv_dx2_max/3.0);
-    dtnew = std::min(dtnew, 1.0/rate);
+    dtnew = std::min(dtnew, static_cast<Real>(1.0/rate));
   }
   return;
 }

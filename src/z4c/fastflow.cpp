@@ -527,8 +527,9 @@ void FastFlow::MetricDerivatives(Real time) {
   par_for("FastFlow_metric_derivatives",DevExeSpace(),0,nmb-1,ks,ke,js,je,is,ie,
   KOKKOS_LAMBDA(int m, int k, int j, int i) {
     // Grid spacing
-    Real idx[] = {1.0 / size.d_view(m).dx1, 1.0 / size.d_view(m).dx2,
-                  1.0 / size.d_view(m).dx3};
+    Real idx[] = {static_cast<Real>(1.0) / size.d_view(m).dx1,
+                  static_cast<Real>(1.0) / size.d_view(m).dx2,
+                  static_cast<Real>(1.0) / size.d_view(m).dx3};
 
     // x-derivative
     dg_(m,D1S11,k,j,i) = Dx<NGHOST>(0, idx, adm.g_dd, m, 0, 0, k, j, i);

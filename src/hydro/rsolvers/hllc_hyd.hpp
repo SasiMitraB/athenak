@@ -28,9 +28,9 @@ void HLLC(const EOS_Data &eos,
   constexpr int ivy = IVX + ((ivx - IVX) + 1) % 3;
   constexpr int ivz = IVX + ((ivx - IVX) + 2) % 3;
 
-  const Real gm1   = eos.gamma - 1.0;
-  const Real igm1  = 1.0 / gm1;
-  const Real alpha = ((eos.gamma) + 1.0) / (2.0 * (eos.gamma));
+  const Real gm1   = eos.gamma - Real(1.0);
+  const Real igm1  = Real(1.0) / gm1;
+  const Real alpha = ((eos.gamma) + Real(1.0)) / (Real(2.0) * (eos.gamma));
 
 
   // L/R primitives at face
@@ -51,20 +51,22 @@ void HLLC(const EOS_Data &eos,
   Real qa, qb, qc, qd, qe, qf;
   qa = eos.IdealHydroSoundSpeed(wl_idn, wl_ipr);
   qb = eos.IdealHydroSoundSpeed(wr_idn, wr_ipr);
-  Real el = wl_ipr * igm1 + 0.5 * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
-  Real er = wr_ipr * igm1 + 0.5 * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
-  qc = 0.25 * (wl_idn + wr_idn) * (qa + qb);
-  qd = 0.5 * (wl_ipr + wr_ipr + (wl_ivx - wr_ivx) * qc);  // P_mid
+  Real el = wl_ipr * igm1
+          + Real(0.5) * wl_idn * (SQR(wl_ivx) + SQR(wl_ivy) + SQR(wl_ivz));
+  Real er = wr_ipr * igm1
+          + Real(0.5) * wr_idn * (SQR(wr_ivx) + SQR(wr_ivy) + SQR(wr_ivz));
+  qc = Real(0.25) * (wl_idn + wr_idn) * (qa + qb);
+  qd = Real(0.5) * (wl_ipr + wr_ipr + (wl_ivx - wr_ivx) * qc);  // P_mid
 
-  qe = (qd <= wl_ipr) ? 1.0 : sqrt(1.0 + alpha * ((qd / wl_ipr) - 1.0));
-  qf = (qd <= wr_ipr) ? 1.0 : sqrt(1.0 + alpha * ((qd / wr_ipr) - 1.0));
+  qe = (qd <= wl_ipr) ? Real(1.0) : sqrt(Real(1.0) + alpha * ((qd / wl_ipr) - Real(1.0)));
+  qf = (qd <= wr_ipr) ? Real(1.0) : sqrt(Real(1.0) + alpha * ((qd / wr_ipr) - Real(1.0)));
 
   // Max/min wave speeds
   qc = wl_ivx - qa * qe;  // al
   qd = wr_ivx + qb * qf;  // ar
 
-  qa = qd > 0.0 ? qd : 1.0e-20;   // bp
-  qb = qc < 0.0 ? qc : -1.0e-20;  // bm
+  qa = qd > Real(0.0) ? qd : Real(1.0e-20);   // bp
+  qb = qc < Real(0.0) ? qc : -Real(1.0e-20);  // bm
 
   // Contact wave speed and pressure
   qe = wl_ivx - qc;  // vxl
@@ -78,7 +80,7 @@ void HLLC(const EOS_Data &eos,
 
   Real am = (qc - qd) / (ml + mr);
   Real cp = (ml * qd + mr * qc) / (ml + mr);
-  cp = cp > 0.0 ? cp : 0.0;
+  cp = cp > Real(0.0) ? cp : Real(0.0);
 
   // L/R fluxes along bm (qb) and bp (qa)
   qe = wl_idn * (wl_ivx - qb);
@@ -96,7 +98,7 @@ void HLLC(const EOS_Data &eos,
   Real fr_e  = er * (wr_ivx - qa) + wr_ipr * wr_ivx;
 
   // Flux weights
-  if (am >= 0.0) {
+  if (am >= Real(0.0)) {
     qc =  am / (am - qb);
     qd = 0.0;
     qe = -qb / (am - qb);

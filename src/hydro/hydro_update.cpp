@@ -44,7 +44,7 @@ TaskStatus Hydro::RKUpdate(Driver *pdriver, int stage) {
   // hierarchical parallel loop that updates conserved variables to intermediate step
   // using weights and fractional time step appropriate to stages of time-integrator.
   // Vector inner loop used for good performance on cpus
-  int scr_level = 0;
+  constexpr int scr_level = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1);
 
   par_for_outer("h_update",DevExeSpace(),scr_size,scr_level,0,nmb1,0,nvar-1,ks,ke,js,je,

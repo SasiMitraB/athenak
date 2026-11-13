@@ -229,7 +229,7 @@ TaskStatus OrbitalAdvectionCC::RecvAndUnpackCC(DvceArray5D<Real> &a,
   Real &dt = pmy_pack->pmesh->dt;
   Real qo = qshear*omega0;
 
-  int scr_lvl=0;
+  constexpr int scr_lvl = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(nfx) * 2;
   par_for_outer("oa-unpk",DevExeSpace(),scr_size,scr_lvl,0,(nmb-1),0,(nvar-1),ks,ke,is,ie,
   KOKKOS_LAMBDA(TeamMember_t member, const int m, const int n, const int k, const int i) {

@@ -94,7 +94,7 @@ void IdealHydro::ConsToPrim(DvceArray5D<Real> &cons, DvceArray5D<Real> &prim,
       // convert scalars (if any)
       for (int n=nhyd; n<(nhyd+nscal); ++n) {
         // apply scalar floor
-        if (cons(m,n,k,j,i) < 0.0) {
+        if (cons(m,n,k,j,i) < Real(0.0)) {
           cons(m,n,k,j,i) = 0.0;
         }
         prim(m,n,k,j,i) = cons(m,n,k,j,i)/u.d;

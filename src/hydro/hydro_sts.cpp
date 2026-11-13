@@ -114,7 +114,7 @@ TaskStatus Hydro::STSUpdate(Driver *pdrive, int stage) {
   auto flx3 = uflx.x3f;
   auto &mbsize = pmy_pack->pmb->mb_size;
 
-  int scr_level = 0;
+  constexpr int scr_level = 0;
   size_t scr_size = ScrArray1D<Real>::shmem_size(ncells1);
 
   par_for_outer("hydro_sts_update", DevExeSpace(), scr_size, scr_level, 0, nmb1,

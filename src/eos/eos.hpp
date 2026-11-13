@@ -36,7 +36,7 @@ struct EOS_Data {
   // or temperature e/d) into pressure.
   KOKKOS_INLINE_FUNCTION
   Real IdealGasPressure(const Real eint) const {
-    return ((gamma-1.0)*eint);
+    return ((gamma-Real(1.0))*eint);
   }
 
   // NON-RELATIVISTIC IDEAL GAS HYDRO: inlined sound speed function
@@ -53,7 +53,7 @@ struct EOS_Data {
     Real ct2 = by*by + bz*bz;
     Real qsq = bx*bx + ct2 + asq;
     Real tmp = bx*bx + ct2 - asq;
-    return sqrt(0.5*(qsq + sqrt(tmp*tmp + 4.0*asq*ct2))/d);
+    return sqrt(Real(0.5)*(qsq + sqrt(tmp*tmp + Real(4.0)*asq*ct2))/d);
   }
 
   // NON-RELATIVISTIC ISOTHERMAL MHD: inlined fast magnetosonic speed function
@@ -64,7 +64,7 @@ struct EOS_Data {
     Real ct2 = by*by + bz*bz;
     Real qsq = bx*bx + ct2 + asq;
     Real tmp = bx*bx + ct2 - asq;
-    return sqrt(0.5*(qsq + sqrt(tmp*tmp + 4.0*asq*ct2))/d);
+    return sqrt(Real(0.5)*(qsq + sqrt(tmp*tmp + Real(4.0)*asq*ct2))/d);
   }
 
   // SPECIAL RELATIVISTIC IDEAL GAS HYDRO: inlined maximal sound wave speeds function
@@ -80,11 +80,11 @@ struct EOS_Data {
   KOKKOS_INLINE_FUNCTION
   void IdealSRHydroSoundSpeeds(const Real d, const Real p, const Real ux, const Real lor,
                                Real& l_p, Real& l_m) const {
-    Real cs2 = gamma*p / (d + gamma*p/(gamma - 1.0));  // (DZB 73)
-    Real v2 = 1.0 - 1.0/(lor*lor);
-    auto const p1 = (ux/lor) * (1.0 - cs2);
-    auto const tmp = sqrt(cs2 * ((1.0-v2*cs2) - p1*(ux/lor))) / lor;
-    auto const invden = 1.0/(1.0 - v2*cs2);
+    Real cs2 = gamma*p / (d + gamma*p/(gamma - Real(1.0)));  // (DZB 73)
+    Real v2 = Real(1.0) - Real(1.0)/(lor*lor);
+    auto const p1 = (ux/lor) * (Real(1.0) - cs2);
+    auto const tmp = sqrt(cs2 * ((Real(1.0)-v2*cs2) - p1*(ux/lor))) / lor;
+    auto const invden = Real(1.0)/(Real(1.0) - v2*cs2);
 
     l_p = (p1 + tmp) * invden;
     l_m = (p1 - tmp) * invden;
@@ -98,15 +98,15 @@ struct EOS_Data {
   void IdealSRMHDFastSpeeds(const Real d, const Real p, const Real ux, const Real lor,
                             const Real b_sq, Real& l_p, Real& l_m) const {
     // Calculate comoving fast magnetosonic speed
-    Real w = d + gamma*p/(gamma - 1.0);
+    Real w = d + gamma*p/(gamma - Real(1.0));
     Real cs_sq = gamma*p/w;                            // (DZB 73)
     Real va_sq = b_sq / (b_sq + w);                    // (DZB 73)
     Real cms_sq = cs_sq + va_sq - cs_sq * va_sq;       // (DZB 72)
 
-    Real v2 = 1.0 - 1.0/(lor*lor);
-    auto const p1 = (ux/lor) * (1.0 - cms_sq);
-    auto const tmp = sqrt(cms_sq * ((1.0-v2*cms_sq) - p1*(ux/lor))) / lor;
-    auto const invden = 1.0/(1.0 - v2*cms_sq);
+    Real v2 = Real(1.0) - Real(1.0)/(lor*lor);
+    auto const p1 = (ux/lor) * (Real(1.0) - cms_sq);
+    auto const tmp = sqrt(cms_sq * ((Real(1.0)-v2*cms_sq) - p1*(ux/lor))) / lor;
+    auto const invden = Real(1.0)/(Real(1.0) - v2*cms_sq);
 
     l_p = (p1 + tmp) * invden;
     l_m = (p1 - tmp) * invden;
@@ -131,21 +131,21 @@ struct EOS_Data {
     const Real discriminant_tol = -1.0e-10;  // values between this and 0 are considered 0
 
     // Calculate comoving sound speed
-    Real cs_sq = gamma * p / (d + gamma*p/(gamma - 1.0));
+    Real cs_sq = gamma * p / (d + gamma*p/(gamma - Real(1.0)));
 
     // Set sound speeds in appropriate coordinates
     Real a = SQR(u0) - (g00 + SQR(u0)) * cs_sq;
-    Real b = -2.0 * (u0*u1 - (g01 + u0*u1) * cs_sq);
+    Real b = -Real(2.0) * (u0*u1 - (g01 + u0*u1) * cs_sq);
     Real c = SQR(u1) - (g11 + SQR(u1)) * cs_sq;
-    Real dis = SQR(b) - 4.0*a*c;
-    if (dis < 0.0 && dis > discriminant_tol) {
+    Real dis = SQR(b) - Real(4.0)*a*c;
+    if (dis < Real(0.0) && dis > discriminant_tol) {
       dis = 0.0;
     }
     // TODO(@pdmullen): fmax(dis, 0.0) prevents NaNs (see Issue #7), but this should be
     // eliminated after enforcing positivity on recon L/R densities and pressures
     Real dis_sqrt = sqrt(fmax(dis, 0.0));
-    Real root_1 = (-b + dis_sqrt) / (2.0*a);
-    Real root_2 = (-b - dis_sqrt) / (2.0*a);
+    Real root_1 = (-b + dis_sqrt) / (Real(2.0)*a);
+    Real root_2 = (-b - dis_sqrt) / (Real(2.0)*a);
     if (root_1 > root_2) {
       l_p = root_1;
       l_m = root_2;
@@ -173,21 +173,21 @@ struct EOS_Data {
                             const Real b_sq, const Real g00, const Real g01,
                             const Real g11, Real& l_p, Real& l_m) const {
     // Calculate comoving fast magnetosonic speed
-    Real w = d + gamma*p/(gamma - 1.0);
+    Real w = d + gamma*p/(gamma - Real(1.0));
     Real cs_sq = gamma * p / w;
     Real va_sq = b_sq / (b_sq + w);
     Real cms_sq = cs_sq + va_sq - cs_sq * va_sq;
 
     // Set fast magnetosonic speeds in appropriate coordinates
     Real a = SQR(u0) - (g00 + SQR(u0)) * cms_sq;
-    Real b = -2.0 * (u0 * u1 - (g01 + u0 * u1) * cms_sq);
+    Real b = -Real(2.0) * (u0 * u1 - (g01 + u0 * u1) * cms_sq);
     Real c = SQR(u1) - (g11 + SQR(u1)) * cms_sq;
     Real a1 = b / a;
     Real a0 = c / a;
-    Real s = fmax(SQR(a1) - 4.0 * a0, 0.0);
+    Real s = fmax(SQR(a1) - Real(4.0) * a0, Real(0.0));
     s = sqrt(s);
-    l_p = (a1 >= 0.0) ? -2.0 * a0 / (a1 + s) : (-a1 + s) / 2.0;
-    l_m = (a1 >= 0.0) ? (-a1 - s) / 2.0 : -2.0 * a0 / (a1 - s);
+    l_p = (a1 >= Real(0.0)) ? -Real(2.0) * a0 / (a1 + s) : (-a1 + s) / Real(2.0);
+    l_m = (a1 >= Real(0.0)) ? (-a1 - s) / Real(2.0) : -Real(2.0) * a0 / (a1 - s);
   }
 };
 

@@ -88,7 +88,7 @@ TaskStatus Hydro::NewTimeStep(Driver *pdrive, int stage) {
         max_dv3 = 1.0;
       } else if (is_special_relativistic_) {
         Real v2 = SQR(w0_(m,IVX,k,j,i)) + SQR(w0_(m,IVY,k,j,i)) + SQR(w0_(m,IVZ,k,j,i));
-        Real lor = sqrt(1.0 + v2);
+        Real lor = sqrt(Real(1.0) + v2);
         // FIXME ERM: Ideal fluid for now
         Real p = eos.IdealGasPressure(w0_(m,IEN,k,j,i));
 

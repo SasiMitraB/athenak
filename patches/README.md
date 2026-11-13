@@ -58,6 +58,42 @@ cmake --build build-metal -j
 - Optional: `KOKKOS_IMPL_ACPP_COARSE_EVENTS=1` turns on coarse-grained events
   (slower for small kernels in scaluq's measurements).
 
+Example: the Kelvin-Helmholtz test, verified on an Apple M4.
+
+```sh
+cmake -S athenak -B build-metal ... -DAthena_ENABLE_ACPP_METAL=ON -DPROBLEM=fluids/kh
+cmake --build build-metal -j
+KOKKOS_DEVICE_ID=1 build-metal/src/athena -i athenak/inputs/hydro/kh2d-sin.athinput
+```
+
+It reaches t=2 in 296 cycles at about 1.5e7 zone-cycles/s, roughly 11x one
+CPU core in fp64. Mass and energy are conserved to about 1e-5. The density
+field matches the CPU runs statistically. The pointwise solution differs
+because the GPU random pool hands out states in a different order, so the
+random `vx` seed perturbation (`iprob=3`) differs.
+
+## Writing kernels that run on Metal
+
+Every fp64 operation inside a kernel aborts at run time ("Double type is not
+supported on Metal GPU"). No compiler flag turns double literals into float.
+
+- Write literals as `Real(0.5)`, not `0.5`. With `Real=double` this is a no-op.
+  Use `Real(M_PI)` rather than `M_PI`.
+- To find offenders, compile the fp32 CPU build with `clang++ -Wdouble-promotion`.
+  Only code inside kernels has to be clean.
+- Declare the team scratch level as `constexpr int scr_level = 0;`. A captured
+  run-time `int` hits AdaptiveCpp#2313.
+- Watch tiny epsilons. 1e-42 is a denormal in float and is flushed to zero on
+  GPUs. WENO-Z now uses 1e-14 in fp32 builds; fp64 is unchanged.
+
+So far this has been done only for the code that hydro with WENO-Z and HLLC
+runs through. Other solvers, reconstructions and physics modules still contain
+double literals, and `teno.hpp` has the same epsilon issue.
+
+Upstream bug, not fixed here: `pgen/fluids/kh.cpp` never initialises `scal`
+or `vz` for `iprob=3`, so the passive scalar holds an undefined value (0 on the
+GPU, leftover register contents on the CPU).
+
 ## Known limitations (from the scaluq report and kokkos#9750)
 
 - Reductions and scans use a two-pass scheme under AdaptiveCpp, because the
@@ -66,5 +102,6 @@ cmake --build build-metal -j
 - `Random_XorShift64_Pool::get_state()` can hang with very large launches
   (around 2^24 work-items) on Metal.
 - A run-time choice of `team_scratch(level)` can fail with "Conflicting address
-  space information in PHI node" (AdaptiveCpp#2313).
+  space information in PHI node" (AdaptiveCpp#2313). This is avoided with
+  `constexpr` scratch levels (see above).
 - Kernel launch latency is about 20–65 µs per small kernel.

@@ -158,7 +158,7 @@ TaskStatus IonNeutral::ImpRKUpdate(Driver *pdriver, int estage) {
   mhd::MHD *pmhd = pmy_pack->pmhd;
   hydro::Hydro *phyd = pmy_pack->phydro;
   if (istage > 1) {
-    int scr_level = 0;
+    constexpr int scr_level = 0;
     size_t scr_size = 0;
     auto ui = pmhd->u0;
     auto un = phyd->u0;
